@@ -77,10 +77,13 @@ fn ps<R>(f: impl FnOnce(&mut Ps) -> R) -> R {
 }
 
 fn rand(n: usize) -> usize {
-    ps(|p| {
-        p.rng = p.rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407 + n as u64);
-        ((p.rng >> 33) as usize) % n.max(1)
-    })
+    ps(|p| rand_state(p, n))
+}
+
+// Call directly when PS is already locked; its mutex is not reentrant.
+fn rand_state(p: &mut Ps, n: usize) -> usize {
+    p.rng = p.rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407 + n as u64);
+    ((p.rng >> 33) as usize) % n.max(1)
 }
 
 // Reach's extra, read by the reach hook (f64 bits; None when off).
@@ -347,7 +350,7 @@ pub(super) fn afk_keys(m: &Module) -> Vec<KeyCode> {
     let mut keys = Vec::new();
     if m.b("Jump") {
         let jump = ps(|p| {
-            p.afk_jump = !p.afk_jump && rand(99) == 0;
+            p.afk_jump = !p.afk_jump && rand_state(p, 99) == 0;
             p.afk_jump
         });
         if jump {
