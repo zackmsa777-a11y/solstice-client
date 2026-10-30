@@ -48,6 +48,7 @@ with tempfile.TemporaryDirectory(prefix='sunset-first-wave-tests-') as folder:
         ('profiles', 'test_profiles.py'), ('text-settings', 'test_text_settings.py'),
         ('binds', 'test_binds.py'), ('hud-layout', 'test_hud_layout.py'),
         ('integration-events', 'test_integration_events.py'),
+        ('anti-afk', 'test_anti_afk.py'),
     ]]
     for name, source in [
         ('draft', 'test_text_edit.rs'), ('registry-picker', 'test_registry_picker.rs'),

@@ -12,6 +12,8 @@ HUD positioning `b5bc5f9`, `9ffa6df`, and fast-drag release correction `f7c8ba4`
 Durability `5a1c06a`; Low Health `d0db40b`; and the registry picker `9a4c435`
 with its review correction `c06dc09`. Feature source branches remain
 unchanged. Integration-only commits hold the composition fixes and tests.
+The baseline Anti AFK Jump mutex correction `9b147c5` is also retained as an
+additive cherry-pick so unified movement checks cannot hit that deadlock.
 
 ## Conflict decisions
 
@@ -82,6 +84,10 @@ The HUD suite separately extracts the actual native key-release prefix,
 Hold restoration, HUD release adapter, and close handler. Its combined
 regression verifies both Hold restoration and final drag placement in the same
 release call, without claiming complete native-key/window dispatch coverage.
+The Anti AFK suite extracts the actual player state, mutex, RNG helpers, and
+key policy. Three watchdog-bounded tests verify default Jump returns, preserves
+its seeded sequence and unrelated state, and leaves RNG unchanged when Jump
+is disabled. These are host-free deadlock regressions, not live tick/GUI tests.
 
 Integration preparation does not stage the AST, invoke Cargo, build or launch
 a game, push a branch, or create a PR. The owner performs the final fresh AST
