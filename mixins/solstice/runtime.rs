@@ -1056,7 +1056,14 @@ pub(super) fn toggle(game: &mut Game<'_>, i: usize, announce: bool) {
 // ---------------------------------------------------------------- keys
 
 pub(super) fn key(game: &mut Game<'_>, key: &str, pressed: bool) {
-    if !pressed || !game.native_window() || !game.native_on(ID) {
+    if !game.native_window() {
+        return;
+    }
+    if !pressed {
+        hud_editor::release(game, key);
+        return;
+    }
+    if !game.native_on(ID) {
         return;
     }
     ensure_loaded(game);

@@ -269,6 +269,10 @@ impl Editor {
         if !left {
             self.drag = None;
         }
+        self.move_drag(at);
+        self.bounds = [None; GROUPS];
+    }
+    fn move_drag(&mut self, at: [f32; 2]) {
         if let Some((group, offset)) = self.drag
             && let Some(r) = self.bounds[group.index()]
             && at.into_iter().all(f32::is_finite)
@@ -277,10 +281,22 @@ impl Editor {
             draft.positions[group.index()] = Some(Position::from_origin(
                 [at[0] - offset[0], at[1] - offset[1]],
                 [r[2], r[3]],
-                view,
+                self.view,
             ));
         }
-        self.bounds = [None; GROUPS];
+    }
+    // Only a real release callback supplies its last observed cursor. A later
+    // unheld frame must not be mistaken for that release point.
+    pub(super) fn release(&mut self, view: [f32; 2], at: [f32; 2]) {
+        let view = [extent(view[0]), extent(view[1])];
+        if self.view != view {
+            self.drag = None;
+            self.bounds = [None; GROUPS];
+            self.view = view;
+            return;
+        }
+        self.move_drag(at);
+        self.drag = None;
     }
     pub(super) fn place(&mut self, group: Group, size: [f32; 2], auto: [f32; 2]) -> [f32; 2] {
         let at = self
@@ -387,6 +403,29 @@ mod tests {
         e.cancel();
         e.begin();
         assert!(e.bounds.iter().all(Option::is_none));
+    }
+    #[test]
+    fn fast_release_commits_last_pointer_once_without_an_intermediate_frame() {
+        let mut e = begin();
+        e.place(Group::Info, [150.0, 22.0], [2.0, 16.0]);
+        e.press([80.0, 36.0]);
+        e.release([400.0, 300.0], [200.0, 96.0]);
+        assert_eq!(e.place(Group::Info, [150.0, 22.0], [2.0, 16.0]), [122.0, 76.0]);
+        e.release([400.0, 300.0], [350.0, 250.0]);
+        e.frame([400.0, 300.0], [390.0, 280.0], false);
+        assert_eq!(e.place(Group::Info, [150.0, 22.0], [2.0, 16.0]), [122.0, 76.0]);
+        assert!(e.saved.positions[Group::Info.index()].is_none());
+    }
+    #[test]
+    fn resize_before_release_cancels_the_old_grab_offset() {
+        let mut e = begin();
+        e.place(Group::Info, [150.0, 22.0], [2.0, 16.0]);
+        e.press([80.0, 36.0]);
+        e.release([500.0, 300.0], [200.0, 96.0]);
+        assert!(e.position(Group::Info).is_none());
+        assert!(e.drag.is_none());
+        e.frame([500.0, 300.0], [300.0, 200.0], false);
+        assert!(e.position(Group::Info).is_none());
     }
     #[test]
     fn apply_is_explicit_reset_is_draft_only() {

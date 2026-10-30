@@ -5,7 +5,7 @@ use super::{
     Game,
     solstice::{self, ACCENT, ID, Shape, with},
 };
-use horizon_client::{extras::Corner, extras_hud::Corners};
+use horizon_client::{extras::Corner, extras_hud::Corners, hud::HudBatch};
 use std::io::Read;
 
 const FILE: &str = "hud-layout-v1";
@@ -79,6 +79,33 @@ pub(super) fn frame(game: &mut Game<'_>) {
         Some(Action::Reset) => with(|s| s.hud_edit.reset()),
         None => {}
     }
+}
+
+// Mouse-up reaches native_key through extras_mouse even between HUD frames.
+pub(super) fn release(game: &mut Game<'_>, key: &str) {
+    if key != "key.mouse.left" || !with(|s| s.hud_edit.active()) {
+        return;
+    }
+    if !game.native_window()
+        || !game.native_on(ID)
+        || !game.native_playing()
+        || game.player.is_none()
+        || game.ui.hide_gui
+        || (!game.focused && game.control.is_none())
+        || with(|s| s.hud_edit_dimension.as_deref() != Some(game.dim.id()))
+    {
+        solstice::close_gui(game);
+        return;
+    }
+    let Some(renderer) = game.renderer.as_ref() else {
+        solstice::close_gui(game);
+        return;
+    };
+    // A resize can arrive before another HUD frame. Use the host's current
+    // GUI scale calculation instead of the previous rendered bounds' viewport.
+    let batch = HudBatch::new([renderer.config.width, renderer.config.height]);
+    let at = [game.cursor.0, game.cursor.1];
+    with(|s| s.hud_edit.release([batch.width, batch.height], at));
 }
 
 pub(super) fn start_frame(game: &Game<'_>, view: [f32; 2]) {
