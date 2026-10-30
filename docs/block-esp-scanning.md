@@ -1,11 +1,12 @@
 # Block ESP bounded scanning pilot
 
-Block ESP reads loaded blocks incrementally on the client tick. Its fixed defaults
-are a hard limit of **4096 block reads per tick** and a **1 ms elapsed-time target**,
+Block ESP reads loaded blocks incrementally on the client tick. This follow-up shares
+its **4096 block reads per tick** and **1 ms elapsed-time target** with Hole ESP;
+see [shared render scans](shared-render-scans.md). The deadline is
 checked before the first read and then every 64 reads. A slow read or batch can
 exceed the time target. This is a work limit, not a measured frame-time guarantee.
 No chunks are requested or generated; the existing read-only `world.block` accessor
-returns air for absent chunks. Other scanning modules retain their current behavior.
+returns air for absent chunks. Scanners other than these two retain their current behavior.
 
 The existing presets and colours, inclusive cuboid range (8–48), Y clamp
 (-64 through 320), x/z/y traversal order, first-2000-match cap, fill setting and
