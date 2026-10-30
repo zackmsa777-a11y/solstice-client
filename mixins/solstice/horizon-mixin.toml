@@ -584,3 +584,9 @@ kind = "HEAD"
 target = "horizon_client::game::remote::Game<'_>::enter_remote_dimension"
 helper = "scan_reset.rs"
 bindings = []
+
+[[module]]
+id = "registry_picker"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_registry_picker"
+source = "registry_picker.rs"

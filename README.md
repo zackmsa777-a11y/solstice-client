@@ -53,6 +53,8 @@ Press **`** (or **Right Shift**) for the menu. Every category is a panel.
   or longer values stay unchanged and can still be changed with `.set`.
 - **Bind activation** defaults to Toggle. Supported modules also offer Hold, which temporarily enables the module
   while its input is down. See [keyboard and mouse binds](docs/input-binds.md) for aliases, commands, and supported modules.
+- Supported **block/item lists** also offer a searchable registry picker in that draft. Add/Remove changes
+  only the draft; unknown/custom entries stay intact. See [registry picker](docs/registry-picker.md) for supported fields.
 
 Changes are saved immediately, except text drafts, which are saved only on **Apply**. Losing window focus cancels a draft.
 The text editor reads native Winit keyboard text, including punctuation and layout-produced Unicode; cursor movement and
