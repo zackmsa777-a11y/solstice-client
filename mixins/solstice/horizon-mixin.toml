@@ -15,6 +15,18 @@ name = "solstice"
 source = "runtime.rs"
 
 [[module]]
+id = "armor_model"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_armor_model"
+source = "armor_model.rs"
+
+[[module]]
+id = "armor_hud"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_armor_hud"
+source = "armor_hud.rs"
+
+[[module]]
 id = "util"
 file = "crates/horizon-client/src/game.rs"
 name = "solstice_util"
