@@ -310,6 +310,9 @@ pub(super) fn defaults() -> Vec<Module> {
             .bool("Speed", false)
             .bool("Facing", true)
             .bool("Totems", false),
+        Module::new("Armor Durability", Render, "Shows the durability of your four equipped armor slots.")
+            .pick("Corner", &["Bottom left", "Bottom right", "Top left", "Top right"])
+            .pick("Display", &["Both", "Remaining", "Percent"]),
         Module::new("Fullbright", Render, "Lights everything up."),
         Module::new("ESP", Render, "Draws boxes around entities, through walls.")
             .pick("Mode", &["3D box", "2D box"])
@@ -3219,6 +3222,8 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
             }
         }
     }
+
+    super::solstice_armor_hud::draw(game, &mods, corners, &mut shapes);
 
     if with(|s| s.gui.open && s.gui.closing) {
         close_gui(game);
