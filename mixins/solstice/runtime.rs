@@ -303,6 +303,10 @@ pub(super) fn defaults() -> Vec<Module> {
             .bool("Speed", false)
             .bool("Facing", true)
             .bool("Totems", false),
+        Module::new("Keybinds HUD", Render, "Shows bound modules, their keys and their current ON/OFF state.")
+            .bool("Only active", false)
+            .num("Max rows", 8.0, 1.0, 20.0, 1.0)
+            .pick("Corner", &["Bottom left", "Bottom right", "Top left", "Top right"]),
         Module::new("Fullbright", Render, "Lights everything up."),
         Module::new("ESP", Render, "Draws boxes around entities, through walls.")
             .pick("Mode", &["3D box", "2D box"])
@@ -2998,6 +3002,8 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
             }
         }
     }
+
+    super::solstice_keybinds_hud::draw(game, corners, [w, h], &mut shapes);
 
     if with(|s| s.gui.open && s.gui.closing) {
         close_gui(game);

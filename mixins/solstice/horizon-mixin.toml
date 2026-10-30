@@ -15,6 +15,18 @@ name = "solstice"
 source = "runtime.rs"
 
 [[module]]
+id = "keybinds_model"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_keybinds_model"
+source = "keybinds_model.rs"
+
+[[module]]
+id = "keybinds_hud"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_keybinds_hud"
+source = "keybinds_hud.rs"
+
+[[module]]
 id = "util"
 file = "crates/horizon-client/src/game.rs"
 name = "solstice_util"
