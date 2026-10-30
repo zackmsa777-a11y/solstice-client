@@ -53,6 +53,18 @@ name = "solstice_armor_hud"
 source = "armor_hud.rs"
 
 [[module]]
+id = "low_health_model"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_low_health_model"
+source = "low_health_model.rs"
+
+[[module]]
+id = "low_health"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_low_health"
+source = "low_health.rs"
+
+[[module]]
 id = "util"
 file = "crates/horizon-client/src/game.rs"
 name = "solstice_util"

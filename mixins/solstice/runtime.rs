@@ -313,6 +313,10 @@ pub(super) fn defaults() -> Vec<Module> {
         Module::new("Armor Durability", Render, "Shows the durability of your four equipped armor slots.")
             .pick("Corner", &["Bottom left", "Bottom right", "Top left", "Top right"])
             .pick("Display", &["Both", "Remaining", "Percent"]),
+        Module::new("Low Health", Render, "A steady warning for low base health in HP; absorption is excluded.")
+            .num("Threshold HP", 6.0, 1.0, 40.0, 0.5)
+            .num("Hysteresis HP", 2.0, 0.0, 20.0, 0.5)
+            .pick("Corner", &["Bottom right", "Bottom left", "Top left", "Top right"]),
         Module::new("Fullbright", Render, "Lights everything up."),
         Module::new("ESP", Render, "Draws boxes around entities, through walls.")
             .pick("Mode", &["3D box", "2D box"])
@@ -469,6 +473,7 @@ pub(super) enum Page {
 
 pub(super) struct State {
     pub(crate) modules: Vec<Module>,
+    pub(super) low_health: super::solstice_low_health_model::Warning,
     page: Page,
     // A module waiting for its key bind (its index).
     binding: Option<usize>,
@@ -541,6 +546,7 @@ impl State {
     pub(super) fn new() -> Self {
         Self {
             modules: defaults(),
+            low_health: super::solstice_low_health_model::Warning::default(),
             page: Page::Main,
             binding: None,
             inputs: super::solstice_bind_state::Inputs::default(),
@@ -3224,6 +3230,7 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
     }
 
     super::solstice_armor_hud::draw(game, &mods, corners, &mut shapes);
+    super::solstice_low_health::draw(game, &mods, corners, &mut shapes);
 
     if with(|s| s.gui.open && s.gui.closing) {
         close_gui(game);
