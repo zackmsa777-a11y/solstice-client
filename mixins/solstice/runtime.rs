@@ -1197,6 +1197,7 @@ pub(super) fn key(game: &mut Game<'_>, key: &str, pressed: bool) {
     }
     if !pressed {
         with(|s| { let held = s.inputs.release(key); restore_holds(s, held); });
+        hud_editor::release(game, key);
         return;
     }
     if !game.native_on(ID) || !game.focused {

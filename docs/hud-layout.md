@@ -20,6 +20,8 @@ keeping that pixel inset as the viewport or content size changes. The origin
 is clamped to the current viewport. Content larger than the viewport starts at
 the edge and may overflow; text is never scaled or resampled by this editor.
 A resize ends an active drag to avoid reusing an old pointer offset.
+Mouse release records its last cursor position even if the whole drag happened
+between HUD frames. Later unheld pointer movement cannot move that draft again.
 
 F1 hides the HUD during normal play; while the editor is open, its input gate
 consumes F1. Editing cannot start while hidden, and an external HUD visibility
