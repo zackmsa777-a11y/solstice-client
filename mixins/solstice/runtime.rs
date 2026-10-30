@@ -3951,7 +3951,7 @@ pub(super) fn text_event(event: &winit::event::WindowEvent) {
                 match &event.logical_key {
                     Key::Named(NamedKey::ArrowUp) => { picker.move_cursor(-1); return; }
                     Key::Named(NamedKey::ArrowDown) => { picker.move_cursor(1); return; }
-                    Key::Named(NamedKey::Enter) => { picker.toggle(picker.cursor, draft); return; }
+                    Key::Named(NamedKey::Enter) => { picker.enter(event.repeat, draft); return; }
                     _ => {}
                 }
                 let shortcut = (modifiers.control_key() && !modifiers.alt_key()) || modifiers.super_key();
