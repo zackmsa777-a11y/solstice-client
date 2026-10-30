@@ -3916,6 +3916,13 @@ pub(super) fn text_event(event: &winit::event::WindowEvent) {
             s.gui.text_key_consumed = false;
             s.gui.text_modifiers = winit::keyboard::ModifiersState::empty();
         }
+        // HUD placement owns this GUI mode. A stale text/registry draft must
+        // never capture its Escape, Tab, Enter, or pointer navigation.
+        if s.hud_edit.active() {
+            s.gui.text_edit = None;
+            s.gui.text_key_consumed = false;
+            return;
+        }
         let WindowEvent::KeyboardInput { event, is_synthetic, .. } = event else { return; };
         if event.state != ElementState::Pressed { return; }
         s.gui.text_key_consumed = s.gui.open && s.gui.text_edit.is_some();

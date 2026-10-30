@@ -11,6 +11,7 @@ fn state() -> State {
                 .bool("Flag", false)
                 .num("Amount", 1.0, 0.0, 10.0, 1.0),
         ],
+        inputs: Default::default(),
         friends: vec![],
         waypoints: vec![],
         gui: Gui { panels: vec![] },
@@ -26,7 +27,7 @@ fn explicit_apply_survives_real_config_serializer_and_loader() {
     draft.insert(value);
     assert_eq!(original.modules[0].t("Messages"), "original");
     // Same verbatim assignment as the GUI's Apply path.
-    original.modules[0].settings[0].value = Value::Text(draft.value().unwrap().to_owned());
+    original.modules[0].settings.iter_mut().find(|s| s.name == "Messages").unwrap().value = Value::Text(draft.value().unwrap().to_owned());
     let serialized = original.save_text();
     let mut loaded = state();
     loaded.load_text(&serialized);
@@ -34,7 +35,7 @@ fn explicit_apply_survives_real_config_serializer_and_loader() {
     assert_eq!(loaded.modules[0].t("Messages"), value);
     // Empty strings, all spaces and embedded '=' are valid text too.
     for value in ["", "   ", "=|", "a=b=c"] {
-        original.modules[0].settings[0].value = Value::Text(value.to_owned());
+        original.modules[0].settings.iter_mut().find(|s| s.name == "Messages").unwrap().value = Value::Text(value.to_owned());
         loaded.load_text(&original.save_text());
         assert_eq!(loaded.modules[0].t("Messages"), value);
     }
@@ -43,7 +44,7 @@ fn explicit_apply_survives_real_config_serializer_and_loader() {
 #[test]
 fn command_parse_still_trims_and_nontext_config_rules_are_unchanged() {
     let mut state = state();
-    assert!(state.modules[0].settings[0].parse("  chat command value  "));
+    assert!(state.modules[0].settings.iter_mut().find(|s| s.name == "Messages").unwrap().parse("  chat command value  "));
     assert_eq!(state.modules[0].t("Messages"), "chat command value");
     state.load_text("spam.flag=  true  \nspam.amount=  4  \nspam.messages=  persisted value  \n");
     assert!(state.modules[0].b("Flag"));

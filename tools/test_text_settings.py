@@ -23,12 +23,15 @@ def section(start, end):
 
 model = section('#[derive(Clone, Copy, Debug, PartialEq, Eq)]', '// Every module with its defaults')
 helpers = section('pub(super) fn on_off(', '// A key typed in a command')
+key_parser = section('pub(super) fn key_from_text(', 'pub(super) fn key_label(')
 serializer = section('    fn save_text(&self)', '    pub(super) fn module(&self')
 navigation = section('fn text_edit_key(', '// The named native-key API')
 draft_path = root / 'mixins/solstice/text_edit.rs'
+bind_path = root / 'mixins/solstice/bind_state.rs'
 tests_path = root / 'tests/text_settings.rs'
 harness = f'''#![allow(dead_code)]
 #[path = r"{draft_path}"] mod text_edit;
+#[path = r"{bind_path}"] mod solstice_bind_state;
 // Only the host key vocabulary is supplied; the navigation mapping below is
 // extracted from production. No physical-code assumptions enter the fixture.
 mod winit {{ pub mod keyboard {{
@@ -40,11 +43,12 @@ use crate::text_edit::EditKey;
 use crate::winit;
 {model}
 {helpers}
+{key_parser}
 {navigation}
 struct Panel {{ x: f32, y: f32, collapsed: bool, scroll: f32 }}
 struct Gui {{ panels: Vec<Panel> }}
 struct Waypoint {{ name: String, pos: [f64;3], dim: String }}
-struct State {{ modules: Vec<Module>, friends: Vec<String>, waypoints: Vec<Waypoint>, gui: Gui }}
+struct State {{ modules: Vec<Module>, inputs: super::solstice_bind_state::Inputs, friends: Vec<String>, waypoints: Vec<Waypoint>, gui: Gui }}
 impl State {{ {serializer} }}
 #[path = r"{tests_path}"] mod tests;
 }}

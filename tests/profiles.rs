@@ -29,6 +29,10 @@ fn modules() -> Vec<Module> {
     vec![m, Module::new("HUD", Category::Render, "test").on().bool("FPS", true)]
 }
 
+fn setting_mut<'a>(module: &'a mut Module, name: &str) -> &'a mut Setting {
+    module.settings.iter_mut().find(|setting| setting.name == name).unwrap()
+}
+
 #[test]
 fn bounded_portable_names() {
     assert_eq!(profiles::name("MiNe_1-a").unwrap(), "mine_1-a");
@@ -51,7 +55,7 @@ fn deterministic_lossless_typed_roundtrip() {
     for m in &mut reordered { m.settings.reverse(); }
     assert_eq!(encoded, profiles::encode(&reordered).unwrap());
     let mut changed = original.clone();
-    changed[0].settings[0].value = Value::Num { v: 50.0, min: 0.1, max: 50.0, step: 0.1 };
+    setting_mut(&mut changed[0], "Speed").value = Value::Num { v: 50.0, min: 0.1, max: 50.0, step: 0.1 };
     assert_eq!(profiles::stage(&changed, &encoded).unwrap(), original);
 }
 
@@ -66,7 +70,7 @@ fn malformed_input_is_all_or_nothing() {
         "solstice-settings-profile=1\nflight.speed=bool:true", "solstice-settings-profile=1\nflight.antikick=bool:toggle",
         "solstice-settings-profile=1\nflight.antikick=true", "solstice-settings-profile=1\nflight.mode=pick:unknown",
         "solstice-settings-profile=1\nflight.list=text:tab\tbad", "solstice-settings-profile=1\nflight.list=text:\0",
-        "solstice-settings-profile=1\nflight.list=text: leading", "solstice-settings-profile=1\nflight.list=text:trailing ",
+        "solstice-settings-profile=1\nflight.list=text:line\u{2028}separator", "solstice-settings-profile=1\nflight.list=text:paragraph\u{2029}separator",
         "solstice-settings-profile=1\nflight.on=bool:true", "solstice-settings-profile=1\nflight.key=text:none",
         "solstice-settings-profile=1\nplugin.missing=bool:true",
         "solstice-settings-profile=1\nflight.speed=num:2\nflight.speed=num:3",
@@ -87,8 +91,31 @@ fn sparse_profile_preserves_other_settings_keys_and_states() {
     assert!(!loaded[0].b("Anti kick"));
     assert_eq!(loaded[0].key, original[0].key);
     assert_eq!(loaded[0].on, original[0].on);
-    assert_eq!(loaded[0].settings[0], original[0].settings[0]);
+    assert_eq!(loaded[0].setting("Speed"), original[0].setting("Speed"));
     assert_eq!(loaded[1], original[1]);
+}
+
+#[test]
+fn padded_unicode_text_survives_profile_config_and_resave() {
+    let original = modules();
+    for value in ["  /msg é 🦀, ore=stone | custom:item  ", "   ", "", "a=b=c"] {
+        let mut edited = original.clone();
+        setting_mut(&mut edited[0], "List").value = Value::Text(value.into());
+        let encoded = profiles::encode(&edited).unwrap();
+        let staged = profiles::stage(&original, &encoded).unwrap();
+        assert_eq!(staged[0].t("List"), value);
+        let temp = Temp::new();
+        let _game = game(&temp);
+        with(|state| {
+            let config = state.save_modules_text(&staged);
+            state.load_text(&config);
+            assert_eq!(state.modules[0].t("List"), value);
+            assert_eq!(profiles::encode(&state.modules).unwrap(), encoded);
+        });
+    }
+    let exact = format!(" {} ", "é".repeat(2047)); // 4096 UTF-8 bytes, with padding.
+    let input = format!("solstice-settings-profile=1\nflight.list=text:{exact}\n");
+    assert_eq!(profiles::stage(&original, &input).unwrap()[0].t("List"), exact);
 }
 
 #[test]
@@ -107,7 +134,7 @@ fn invalid_current_values_cannot_be_saved() {
         Value::Pick { i: 1, of: &["one"] }, Value::Text("a\nb".into()),
     ] {
         let mut m = modules();
-        m[0].settings[0].value = value;
+        setting_mut(&mut m[0], "Speed").value = value;
         assert!(profiles::encode(&m).is_err());
     }
     let duplicate = vec![Module::new("A B", Category::Render, "").bool("X", true), Module::new("AB", Category::Render, "").bool("X", false)];
@@ -232,6 +259,7 @@ fn links_and_windows_junctions_cannot_redirect_storage() {
 fn game(temp: &Temp) -> Game<'static> {
     *STATE.lock().unwrap() = Some(State {
         modules: modules(), raw: "lateplugin.speed=4\n".into(), friends: vec!["Friend".into()],
+        inputs: Default::default(),
         waypoints: vec![Waypoint { name: "Home".into(), pos: [1.0, 2.0, 3.0], dim: "overworld".into() }],
         gui: Gui { panels: (0..5).map(|_| Panel { x: 20.0, y: 30.0, collapsed: true, scroll: 0.0 }).collect() },
     });
@@ -244,7 +272,7 @@ fn command_load_saves_backups_preserves_scope_and_can_restore() {
     let mut game = game(&temp);
     profile_command(&mut game, &["save", "mining"]);
     assert!(game.messages.last().unwrap().starts_with("Saved"));
-    with(|s| s.modules[0].settings[0].value = Value::Num { v: 8.5, min: 0.1, max: 50.0, step: 0.1 });
+    with(|s| setting_mut(&mut s.modules[0], "Speed").value = Value::Num { v: 8.5, min: 0.1, max: 50.0, step: 0.1 });
     profile_command(&mut game, &["load", "mining"]);
     assert!(game.messages.last().unwrap().starts_with("Loaded"));
     with(|s| {
@@ -264,7 +292,7 @@ fn command_load_saves_backups_preserves_scope_and_can_restore() {
     assert!(fs::read_to_string(temp.native().join("config")).unwrap().contains("flight.speed=1.123456789123"));
     let persisted = fs::read_to_string(temp.native().join("config")).unwrap();
     with(|s| {
-        s.modules[0].settings[0].value = Value::Num { v: 2.0, min: 0.1, max: 50.0, step: 0.1 };
+        setting_mut(&mut s.modules[0], "Speed").value = Value::Num { v: 2.0, min: 0.1, max: 50.0, step: 0.1 };
         s.load_text(&persisted);
         assert_eq!(s.modules[0].n("Speed"), 1.123456789123);
         assert_eq!(s.friends, ["Friend"]);
@@ -272,6 +300,33 @@ fn command_load_saves_backups_preserves_scope_and_can_restore() {
     });
     profile_command(&mut game, &["load", "before-load"]);
     with(|s| assert_eq!(s.modules[0].n("Speed"), 8.5));
+}
+
+#[test]
+fn profile_load_uses_proposed_values_but_never_persists_a_transient_hold() {
+    let temp = Temp::new();
+    let mut game = game(&temp);
+    with(|state| state.modules.push(Module::new("Zoom", Category::Render, "hold test").num("Factor", 3.0, 1.0, 8.0, 1.0)));
+    profile_command(&mut game, &["save", "held"]);
+    with(|state| {
+        setting_mut(&mut state.modules[0], "Speed").value = Value::Num { v: 8.5, min: 0.1, max: 50.0, step: 0.1 };
+        let zoom = state.modules.len() - 1;
+        state.inputs.hold(zoom, "key.keyboard.z", false);
+        state.modules[zoom].on = true;
+    });
+    profile_command(&mut game, &["load", "held"]);
+    assert!(game.messages.last().unwrap().starts_with("Loaded"));
+    let persisted = fs::read_to_string(temp.native().join("config")).unwrap();
+    let backup = fs::read_to_string(temp.file("before-load.config")).unwrap();
+    assert!(persisted.contains("flight.speed=1.123456789123\n"));
+    assert!(backup.contains("flight.speed=8.5\n"));
+    assert!(persisted.contains("zoom.on=false\n"));
+    assert!(backup.contains("zoom.on=false\n"));
+    with(|state| {
+        let zoom = state.modules.len() - 1;
+        assert!(state.modules[zoom].on);
+        assert!(!state.inputs.saved_on(zoom, state.modules[zoom].on));
+    });
 }
 
 #[test]

@@ -32,9 +32,10 @@ pub(super) fn name(input: &str) -> Result<String, String> {
 }
 
 fn text_ok(value: &str) -> bool {
-    // The normal config trims values on startup. Refuse unrepresentable padding
-    // rather than silently changing a loaded snapshot after a restart.
-    value.len() <= MAX_TEXT && value.trim() == value && !value.chars().any(char::is_control)
+    // Text settings keep their complete config RHS, including padding. Match
+    // the single-line editor's byte and separator limits without trimming.
+    value.len() <= MAX_TEXT
+        && !value.chars().any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
 }
 
 fn fields(modules: &[Module]) -> Result<BTreeMap<String, (usize, usize)>, String> {
@@ -59,7 +60,7 @@ fn stored(value: &Value) -> Result<String, String> {
             && max.is_finite() && min <= max && v >= min && v <= max => format!("num:{v}"),
         Value::Pick { i, of } if of.get(*i).is_some_and(|s| text_ok(s)) => format!("pick:{}", of[*i]),
         Value::Text(t) if text_ok(t) => format!("text:{t}"),
-        _ => return Err("Invalid setting value; text must be at most 4096 bytes, without controls or leading/trailing whitespace.".into()),
+        _ => return Err("Invalid setting value; text must be at most 4096 bytes, without controls or Unicode line separators.".into()),
     })
 }
 

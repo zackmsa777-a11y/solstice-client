@@ -23,7 +23,7 @@ mod close_gui_tests {
     use std::cell::RefCell;
     const ID: &str = "solstice";
     #[derive(Default)]
-    struct Gui { open: bool, closing: bool, drag: Option<()> }
+    struct Gui { open: bool, closing: bool, drag: Option<()>, text_edit: Option<()>, text_key_consumed: bool }
     #[derive(Default)]
     struct State {
         hud_edit: Editor, hud_edit_dimension: Option<String>,
@@ -52,7 +52,7 @@ mod close_gui_tests {
                 *state = State::default();
                 state.hud_edit.begin();
                 state.hud_edit_dimension = Some("overworld".into());
-                state.gui = Gui { open: true, closing: true, drag: Some(()) };
+                state.gui = Gui { open: true, closing: true, drag: Some(()), text_edit: Some(()), text_key_consumed: true };
                 state.binding = Some(0);
             });
             let mut game = Game {
@@ -69,6 +69,7 @@ mod close_gui_tests {
                 assert!(state.hud_edit_dimension.is_none());
                 assert!(!state.gui.open && !state.gui.closing);
                 assert!(state.gui.drag.is_none() && state.binding.is_none());
+                assert!(state.gui.text_edit.is_none() && !state.gui.text_key_consumed);
             });
         }
     }

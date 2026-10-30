@@ -38,8 +38,8 @@ provides checked reads and writes within that native directory, without finding 
 
 The entire profile is parsed and checked before backups or configuration change. Duplicate and unknown
 settings, unsupported versions, mismatched types, invalid choices, nonfinite or out-of-range numbers,
-control characters and text longer than 4096 bytes are errors. Leading/trailing text whitespace is also
-refused because the normal config trims it on startup. Files are limited to 1 MiB, including
+control characters, Unicode line/paragraph separators (U+2028/U+2029), and text longer than 4096 bytes
+are errors. Text padding is preserved by profiles and the normal config loader. Files are limited to 1 MiB, including
 bounded reads of externally edited files. A missing module/setting is left unchanged; a profile that
 names a plugin setting requires that plugin to be registered before loading. Pending config for plugins
 that have not registered yet is carried forward in the normal config.

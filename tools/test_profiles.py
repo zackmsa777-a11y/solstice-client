@@ -24,25 +24,29 @@ def section(start, end):
 
 model = section('#[derive(Clone, Copy, Debug, PartialEq, Eq)]', '// Every module with its defaults')
 helpers = section('pub(super) fn on_off(', '// A key typed in a command')
+key_parser = section('pub(super) fn key_from_text(', 'pub(super) fn key_label(')
 serializer = section('    fn save_text(&self)', '    pub(super) fn module(&self')
 command = section('// Settings profiles by OpenAI Codex', "pub(super) fn chat(")
 profile_path = str(root / 'mixins/solstice/profiles.rs')
+bind_path = str(root / 'mixins/solstice/bind_state.rs')
 tests_path = str(root / 'tests/profiles.rs')
 harness = f'''#![allow(dead_code)]
 use std::path::PathBuf;
 struct Game<'a> {{ root: PathBuf, messages: Vec<String>, marker: std::marker::PhantomData<&'a ()> }}
 impl Game<'_> {{ fn native_data_dir(&self, _: &str) -> PathBuf {{ self.root.clone() }} }}
 #[path = r"{profile_path}"] mod solstice_profiles;
+#[path = r"{bind_path}"] mod solstice_bind_state;
 mod solstice {{
 use super::Game;
 use std::sync::Mutex;
 const ID: &str = "solstice";
 {model}
 {helpers}
+{key_parser}
 struct Panel {{ x: f32, y: f32, collapsed: bool, scroll: f32 }}
 struct Gui {{ panels: Vec<Panel> }}
 struct Waypoint {{ name: String, pos: [f64;3], dim: String }}
-pub(super) struct State {{ modules: Vec<Module>, raw: String, friends: Vec<String>, waypoints: Vec<Waypoint>, gui: Gui }}
+pub(super) struct State {{ modules: Vec<Module>, inputs: super::solstice_bind_state::Inputs, raw: String, friends: Vec<String>, waypoints: Vec<Waypoint>, gui: Gui }}
 impl State {{ {serializer} }}
 static STATE: Mutex<Option<State>> = Mutex::new(None);
 pub(super) fn with<R>(f: impl FnOnce(&mut State) -> R) -> R {{ f(STATE.lock().unwrap().as_mut().unwrap()) }}
