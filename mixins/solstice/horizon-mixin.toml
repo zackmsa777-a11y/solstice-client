@@ -470,3 +470,9 @@ helper = "menu_pause_hook.rs"
 bindings = [
   { name = "in_world", ty = "bool", value = "in_world" },
 ]
+
+[[module]]
+id = "registry_picker"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_registry_picker"
+source = "registry_picker.rs"

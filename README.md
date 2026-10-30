@@ -51,6 +51,8 @@ Press **`** (or **Right Shift**) for the menu. Every category is a panel.
   Backspace, Delete, Home, End, arrows and Ctrl+A work in the editor. Values keep their spaces, commas, pipes and
   punctuation exactly; the editor accepts at most 4096 UTF-8 bytes and rejects control characters. Existing invalid
   or longer values stay unchanged and can still be changed with `.set`.
+- Supported **block/item lists** also offer a searchable registry picker in that draft. Add/Remove changes
+  only the draft; unknown/custom entries stay intact. See [registry picker](docs/registry-picker.md) for supported fields.
 
 Changes are saved immediately, except text drafts, which are saved only on **Apply**. Losing window focus cancels a draft.
 The text editor reads native Winit keyboard text, including punctuation and layout-produced Unicode; cursor movement and

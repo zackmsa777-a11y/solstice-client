@@ -9,6 +9,7 @@
 use super::{Game, Screen};
 use super::solstice_visual::{distance_colour, draw_box, entity_colour, faded};
 use super::solstice_text_edit::{Draft, EditKey};
+use super::solstice_registry_picker::{self as registry_picker, Catalog, Cache, Panel as EditorPanel, Picker};
 use horizon_client::extras::Corner;
 use horizon_client::extras_hud::Corners;
 use horizon_client::hud::HudBatch;
@@ -3445,16 +3446,18 @@ struct TextEditor {
     setting: usize,
     // Invalid existing .set/config values are never silently truncated.
     draft: Result<Draft, &'static str>,
+    picker: Option<Picker>,
 }
 
-fn text_editor_rect(w: f32, h: f32) -> [f32; 4] {
-    let width = (w - 8.0).clamp(1.0, 320.0);
-    [(w - width) / 2.0, ((h - 76.0) / 2.0).max(0.0), width, 76.0]
-}
-
-fn text_editor_buttons(r: [f32; 4]) -> ([f32; 4], [f32; 4]) {
-    let width = ((r[2] - 18.0) / 2.0).clamp(1.0, 48.0);
-    ([r[0] + 6.0, r[1] + 42.0, width, 13.0], [r[0] + 12.0 + width, r[1] + 42.0, width, 13.0])
+// Catalogs come only from the host's loaded exports, once per resource identity.
+static REGISTRY_CACHE: Mutex<Cache<super::Resources>> = Mutex::new(Cache::new());
+fn registry_catalog(game: &Game<'_>) -> std::sync::Arc<Catalog> {
+    REGISTRY_CACHE.lock().unwrap_or_else(|error| error.into_inner()).get(&game.res, || {
+        Catalog::new(
+            game.res.facts().states.iter().map(|state| state.name.to_string()),
+            game.res.items().items.iter().map(|(id, item)| (id.to_string(), item.block.is_some())),
+        )
+    })
 }
 
 // Five panels fit a 427-pixel-wide GUI (1280 by 720 at scale 3).
@@ -3551,7 +3554,13 @@ pub(super) fn gui_rows(s: &State) -> Vec<([f32; 4], Hit)> {
 pub(super) fn gui_wheel(game: &Game<'_>, steps: f32) {
     let at = game.cursor;
     with(|s| {
-        if s.gui.text_edit.is_some() { return; }
+        let panel = EditorPanel::new(s.gui.view_w, s.gui.view_h, true);
+        if let Some(edit) = s.gui.text_edit.as_mut() {
+            if panel.browse && inside(panel.rect, at) && let Some(picker) = edit.picker.as_mut() {
+                picker.move_cursor(if steps > 0.0 { -(panel.rows as isize) } else if steps < 0.0 { panel.rows as isize } else { 0 });
+            }
+            return;
+        }
         for c in 0..CATEGORIES.len() {
             let p = s.gui.panels[c];
             let (_, content) = panel_body(s, c);
@@ -3666,8 +3675,33 @@ pub(super) fn text_event(event: &winit::event::WindowEvent) {
             s.gui.text_edit = None;
             return;
         }
-        let Some(TextEditor { draft: Ok(draft), .. }) = s.gui.text_edit.as_mut() else { return; };
+        let browse = EditorPanel::new(s.gui.view_w, s.gui.view_h, true).browse;
         let modifiers = s.gui.text_modifiers;
+        let Some(TextEditor { draft: Ok(draft), picker, .. }) = s.gui.text_edit.as_mut() else { return; };
+        if let Some(picker) = picker {
+            if !browse { picker.search_focus = false; }
+            if browse && matches!(event.logical_key, winit::keyboard::Key::Named(winit::keyboard::NamedKey::Tab)) {
+                picker.search_focus = !picker.search_focus;
+                return;
+            }
+            if picker.search_focus {
+                use winit::keyboard::{Key, NamedKey};
+                match &event.logical_key {
+                    Key::Named(NamedKey::ArrowUp) => { picker.move_cursor(-1); return; }
+                    Key::Named(NamedKey::ArrowDown) => { picker.move_cursor(1); return; }
+                    Key::Named(NamedKey::Enter) => { picker.toggle(picker.cursor, draft); return; }
+                    _ => {}
+                }
+                let shortcut = (modifiers.control_key() && !modifiers.alt_key()) || modifiers.super_key();
+                let select_all = shortcut && matches!(&event.logical_key, Key::Character(c) if c.eq_ignore_ascii_case("a"));
+                if let Some(key) = if select_all { Some(EditKey::SelectAll) } else { text_edit_key(&event.logical_key) } {
+                    picker.key_query(key);
+                } else if !shortcut && let Some(text) = event.text.as_deref() {
+                    if !text.chars().any(char::is_control) { picker.insert_query(text); }
+                }
+                return;
+            }
+        }
         // AltGr may report Ctrl+Alt; its produced text is still ordinary text.
         let shortcut = (modifiers.control_key() && !modifiers.alt_key()) || modifiers.super_key();
         let select_all = shortcut && matches!(&event.logical_key, winit::keyboard::Key::Character(c) if c.eq_ignore_ascii_case("a"));
@@ -3802,19 +3836,38 @@ pub(super) fn gui_press(game: &mut Game<'_>, button: winit::event::MouseButton) 
     let mut changed = false;
     with(|s| {
         if let Some(edit) = s.gui.text_edit.as_ref() {
-            let (apply, cancel) = text_editor_buttons(text_editor_rect(s.gui.view_w, s.gui.view_h));
+            let panel = EditorPanel::new(s.gui.view_w, s.gui.view_h, edit.picker.is_some());
+            let (apply, cancel) = panel.buttons();
             if !right && inside(cancel, at) {
                 s.gui.text_edit = None;
             } else if !right && inside(apply, at) {
-                // Commit verbatim, without .set's trimming or list assumptions.
-                if let Ok(draft) = &edit.draft
-                    && let Ok(value) = draft.value()
-                    && let Some(setting) = s.modules.get_mut(edit.module).and_then(|m| m.settings.get_mut(edit.setting))
+                // The existing explicit Apply is still the only persistent write.
+                let commit = edit.draft.as_ref().ok().and_then(|draft| draft.value().ok())
+                    .map(|value| (edit.module, edit.setting, value.to_owned()));
+                if let Some((module, setting, value)) = commit
+                    && let Some(setting) = s.modules.get_mut(module).and_then(|m| m.settings.get_mut(setting))
                     && let Value::Text(stored) = &mut setting.value
                 {
-                    changed = stored != value;
-                    *stored = value.to_owned();
+                    changed = *stored != value;
+                    *stored = value;
                     s.gui.text_edit = None;
+                }
+            } else if !right && let Some(edit) = s.gui.text_edit.as_mut()
+                && let Some(picker) = edit.picker.as_mut()
+            {
+                if inside(panel.raw(), at) { picker.search_focus = false; }
+                if panel.browse {
+                    if inside(panel.search(), at) { picker.search_focus = true; }
+                    let (previous, next) = panel.pages();
+                    if inside(previous, at) { picker.move_cursor(-(panel.rows as isize)); }
+                    else if inside(next, at) { picker.move_cursor(panel.rows as isize); }
+                    else {
+                        let selected = picker.visible(panel.rows).enumerate().find_map(|(row, (index, _))| inside(panel.row(row), at).then_some(index));
+                        if let Some(index) = selected && let Ok(draft) = &mut edit.draft {
+                            picker.cursor = index;
+                            picker.toggle(index, draft);
+                        }
+                    }
                 }
             }
             return;
@@ -3855,7 +3908,9 @@ pub(super) fn gui_press(game: &mut Game<'_>, button: winit::event::MouseButton) 
             }
             (Hit::Setting(i, j), right) => {
                 if let Value::Text(text) = &s.modules[i].settings[j].value {
-                    s.gui.text_edit = Some(TextEditor { module: i, setting: j, draft: Draft::new(text) });
+                    let picker = registry_picker::field_kind(s.modules[i].name, s.modules[i].settings[j].name)
+                        .map(|kind| Picker::new(registry_catalog(game), kind));
+                    s.gui.text_edit = Some(TextEditor { module: i, setting: j, draft: Draft::new(text), picker });
                     s.gui.drag = None;
                     s.binding = None;
                     return;
@@ -4041,7 +4096,8 @@ pub(super) fn draw_gui(game: &Game<'_>, w: f32, h: f32, out: &mut Vec<Shape>) {
     let hw = game.native_text_width(hint);
     out.push(Shape::Text(hint.to_owned(), [(w - hw) / 2.0, 3.0], 0xC0C0C0));
     if let Some(edit) = with(|s| s.gui.text_edit.clone()) {
-        let r = text_editor_rect(w, h);
+        let panel = EditorPanel::new(w, h, edit.picker.is_some());
+        let r = panel.rect;
         let [x, y, rw, _] = r;
         let max = (rw - 16.0).max(0.0);
         out.push(Shape::Fill([0.0, 0.0, w, h], 0xB000_0000));
@@ -4049,7 +4105,8 @@ pub(super) fn draw_gui(game: &Game<'_>, w: f32, h: f32, out: &mut Vec<Shape>) {
         out.push(Shape::Fill([x, y, rw, 1.0], 0xFF00_0000 | ACCENT));
         let title = format!("{} / {}", modules[edit.module].name, modules[edit.module].settings[edit.setting].name);
         out.push(Shape::Text(fit(&title, max), [x + 6.0, y + 5.0], ACCENT));
-        let selected = edit.draft.as_ref().is_ok_and(Draft::selected);
+        let raw_focus = !panel.browse || edit.picker.as_ref().is_none_or(|picker| !picker.search_focus);
+        let selected = raw_focus && edit.draft.as_ref().is_ok_and(Draft::selected);
         out.push(Shape::Fill([x + 6.0, y + 20.0, (rw - 12.0).max(0.0), 14.0], if selected { 0xFF30_60B0 } else { 0xFF08_0808 }));
         let message = match &edit.draft {
             Ok(draft) => {
@@ -4068,7 +4125,7 @@ pub(super) fn draw_gui(game: &Game<'_>, w: f32, h: f32, out: &mut Vec<Shape>) {
                 }
                 out.push(Shape::Text(text[start..end].to_owned(), [x + 8.0, y + 23.0], 0xFFFFFF));
                 let cx = game.native_text_width(&text[start..caret]);
-                out.push(Shape::Fill([x + 8.0 + cx, y + 22.0, 1.0, 10.0], 0xFF00_0000 | ACCENT));
+                if raw_focus { out.push(Shape::Fill([x + 8.0 + cx, y + 22.0, 1.0, 10.0], 0xFF00_0000 | ACCENT)); }
                 draft.error.unwrap_or("Ctrl+A: select all   Esc: cancel   4096 bytes max")
             }
             Err(error) => {
@@ -4076,11 +4133,50 @@ pub(super) fn draw_gui(game: &Game<'_>, w: f32, h: f32, out: &mut Vec<Shape>) {
                 error
             }
         };
-        let (apply, cancel) = text_editor_buttons(r);
+        if panel.browse && let Some(picker) = &edit.picker {
+            let count = format!("Registry search: {} matches", picker.count());
+            out.push(Shape::Text(fit(&count, max), [x + 6.0, y + 38.0], ACCENT));
+            let query = panel.search();
+            out.push(Shape::Fill(query, if picker.search_focus && picker.query.selected() { 0xFF30_60B0 } else if picker.search_focus { 0xFF20_3040 } else { 0xFF08_0808 }));
+            let text = picker.query.text();
+            let caret = picker.query.caret();
+            let mut start = 0;
+            while start < caret && game.native_text_width(&text[start..caret]) > (max - 3.0).max(0.0) {
+                start += text[start..].chars().next().unwrap().len_utf8();
+            }
+            out.push(Shape::Text(fit(&text[start..], max), [query[0] + 2.0, query[1] + 3.0], 0xFFFFFF));
+            if picker.search_focus {
+                let cx = game.native_text_width(&text[start..caret]);
+                out.push(Shape::Fill([query[0] + 2.0 + cx, query[1] + 2.0, 1.0, 10.0], 0xFF00_0000 | ACCENT));
+            }
+            for (row, (index, id)) in picker.visible(panel.rows).enumerate() {
+                let rect = panel.row(row);
+                out.push(Shape::Fill(rect, if index == picker.cursor { 0xFF30_3842 } else { 0xFF20_2020 }));
+                let selected = edit.draft.as_ref().is_ok_and(|draft| registry_picker::contains(draft.text(), id));
+                let label = format!("{} {id}", if selected { "Remove" } else { "Add" });
+                out.push(Shape::Text(fit(&label, max), [rect[0] + 2.0, rect[1] + 2.0], if selected { ACCENT } else { 0xFFFFFF }));
+            }
+            if picker.count() == 0 {
+                let rect = panel.row(0);
+                out.push(Shape::Text(fit("No matches. Try a shorter ID.", max), [rect[0], rect[1] + 2.0], 0xB0B0B0));
+            }
+            let (previous, next) = panel.pages();
+            for (rect, label) in [(previous, "Previous"), (next, "Next")] {
+                out.push(Shape::Fill(rect, if inside(rect, at) { 0xFF38_3838 } else { 0xFF24_2424 }));
+                out.push(Shape::Text(label.to_owned(), [rect[0] + 4.0, rect[1] + 2.0], 0xFFFFFF));
+            }
+        }
+        let (apply, cancel) = panel.buttons();
         for (button, label, enabled) in [(apply, "Apply", edit.draft.is_ok()), (cancel, "Cancel", true)] {
             out.push(Shape::Fill(button, if enabled && inside(button, at) { 0xFF38_3838 } else { 0xFF24_2424 }));
             out.push(Shape::Text(label.to_owned(), [button[0] + 4.0, button[1] + 2.0], if enabled { 0xFFFFFF } else { 0x707070 }));
         }
-        out.push(Shape::Text(fit(message, max), [x + 6.0, y + 61.0], 0xB0B0B0));
+        let message = if let Err(error) = &edit.draft { *error } else if let Some(picker) = &edit.picker {
+            if panel.browse {
+                picker.query.error.or(edit.draft.as_ref().ok().and_then(|draft| draft.error))
+                    .unwrap_or("Tab: field  Up/Down: result  Enter: add/remove")
+            } else { "Larger viewport needed to browse; raw text still works" }
+        } else { message };
+        out.push(Shape::Text(fit(message, max), [x + 6.0, panel.footer()], 0xB0B0B0));
     }
 }
