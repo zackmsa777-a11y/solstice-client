@@ -8,30 +8,32 @@ pub(super) const ROWS: usize = 8;
 const QUERY_BYTES: usize = 128;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Kind { Blocks, BlockItems, Items }
+pub(super) enum Kind { Blocks, BlockItems, VanillaBlockItems, Items }
 
 // Match actual consumers, not a setting-name heuristic or a plugin's unknown field.
 pub(super) fn field_kind(module: &str, setting: &str) -> Option<Kind> {
     match (module, setting) {
         ("Xray", "Blocks") => Some(Kind::Blocks),
-        ("Surround" | "Self Trap" | "Auto Trap" | "Hole Filler" | "Spawn Proofer", "Blocks")
-        | ("Liquid Filler", "Whitelist" | "Blacklist") => Some(Kind::BlockItems),
+        ("Surround" | "Self Trap" | "Auto Trap" | "Hole Filler" | "Spawn Proofer", "Blocks") => Some(Kind::BlockItems),
+        ("Liquid Filler", "Whitelist" | "Blacklist") => Some(Kind::VanillaBlockItems),
         ("Fast Use", "Items") => Some(Kind::Items),
         _ => None,
     }
 }
 
 #[derive(Debug)]
-pub(super) struct Catalog { blocks: Vec<String>, block_items: Vec<String>, items: Vec<String> }
+pub(super) struct Catalog { blocks: Vec<String>, block_items: Vec<String>, vanilla_block_items: Vec<String>, items: Vec<String> }
 impl Catalog {
     pub fn new(blocks: impl IntoIterator<Item = String>, items: impl IntoIterator<Item = (String, bool)>) -> Self {
         fn unique(mut ids: Vec<String>) -> Vec<String> { ids.sort(); ids.dedup(); ids }
         let (mut all, mut block_items) = (Vec::new(), Vec::new());
         for (id, block) in items { if block { block_items.push(id.clone()); } all.push(id); }
-        Self { blocks: unique(blocks.into_iter().collect()), block_items: unique(block_items), items: unique(all) }
+        let block_items = unique(block_items);
+        let vanilla_block_items = block_items.iter().filter(|id| id.starts_with("minecraft:")).cloned().collect();
+        Self { blocks: unique(blocks.into_iter().collect()), block_items, vanilla_block_items, items: unique(all) }
     }
     fn ids(&self, kind: Kind) -> &[String] {
-        match kind { Kind::Blocks => &self.blocks, Kind::BlockItems => &self.block_items, Kind::Items => &self.items }
+        match kind { Kind::Blocks => &self.blocks, Kind::BlockItems => &self.block_items, Kind::VanillaBlockItems => &self.vanilla_block_items, Kind::Items => &self.items }
     }
 }
 
@@ -117,6 +119,11 @@ impl Picker {
             Err(error) => draft.error = Some(error),
         }
     }
+    // Enter is an action, unlike repeating cursor/edit navigation. The raw
+    // Winit adapter passes its repeat flag here before any draft mutation.
+    pub fn enter(&self, repeat: bool, draft: &mut Draft) {
+        if !repeat { self.toggle(self.cursor, draft); }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -160,8 +167,8 @@ mod tests {
         for name in ["Surround", "Self Trap", "Auto Trap", "Hole Filler", "Spawn Proofer"] {
             assert_eq!(field_kind(name, "Blocks"), Some(Kind::BlockItems));
         }
-        assert_eq!(field_kind("Liquid Filler", "Whitelist"), Some(Kind::BlockItems));
-        assert_eq!(field_kind("Liquid Filler", "Blacklist"), Some(Kind::BlockItems));
+        assert_eq!(field_kind("Liquid Filler", "Whitelist"), Some(Kind::VanillaBlockItems));
+        assert_eq!(field_kind("Liquid Filler", "Blacklist"), Some(Kind::VanillaBlockItems));
         assert_eq!(field_kind("Fast Use", "Items"), Some(Kind::Items));
         assert_eq!(field_kind("Spam", "Messages"), None);
         assert_eq!(field_kind("Auto Mount", "Entities"), None);
@@ -177,6 +184,44 @@ mod tests {
         let items = Picker::new(catalog, Kind::Items);
         assert_eq!(items.count(), 2);
         assert_eq!(items.id(1), Some("minecraft:water_bucket"));
+    }
+    #[test]
+    fn liquid_filler_suggestions_follow_its_vanilla_lookup_without_discarding_raw_tokens() {
+        let catalog = Arc::new(Catalog::new([], [
+            ("custom:stone".to_owned(), true),
+            ("minecraft:stone".to_owned(), true),
+            ("minecraft:water_bucket".to_owned(), false),
+        ]));
+        let liquid = Picker::new(catalog.clone(), field_kind("Liquid Filler", "Whitelist").unwrap());
+        assert_eq!(liquid.count(), 1);
+        assert_eq!(liquid.id(0), Some("minecraft:stone"));
+        let surround = Picker::new(catalog, field_kind("Surround", "Blocks").unwrap());
+        assert_eq!(surround.count(), 2);
+        assert_eq!(surround.id(0), Some("custom:stone"));
+        let raw = " custom:stone , unknown:keep , stone ";
+        let mut draft = Draft::new(raw).unwrap();
+        liquid.toggle(0, &mut draft);
+        assert_eq!(draft.text(), " custom:stone , unknown:keep ");
+        assert_eq!(raw, " custom:stone , unknown:keep , stone ");
+    }
+    #[test]
+    fn production_enter_action_ignores_repeat_without_changing_navigation_or_mouse_toggle() {
+        let mut picker = Picker::new(catalog(), Kind::Items);
+        let mut draft = Draft::new("unknown:keep").unwrap();
+        picker.enter(false, &mut draft);
+        let once = draft.text().to_owned();
+        assert_eq!(once, "unknown:keep,minecraft:torch");
+        for _ in 0..5 { picker.enter(true, &mut draft); }
+        assert_eq!(draft.text(), once);
+        picker.move_cursor(1); // Navigation remains repeatable; it has no action-repeat gate.
+        picker.move_cursor(1);
+        assert_eq!(picker.cursor, 1);
+        picker.enter(true, &mut draft);
+        assert_eq!(draft.text(), once);
+        picker.enter(false, &mut draft);
+        assert!(contains(draft.text(), "minecraft:water_bucket"));
+        picker.toggle(picker.cursor, &mut draft); // A separate physical mouse action still toggles.
+        assert_eq!(draft.text(), once);
     }
     #[test]
     fn catalog_cache_builds_only_for_a_new_live_resource_identity() {

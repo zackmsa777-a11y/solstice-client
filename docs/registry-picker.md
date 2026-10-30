@@ -5,6 +5,7 @@ The raw value remains editable. Click its value field or the separate **Registry
 field; Tab switches between them. Search results update as you type. Click **Add** or
 **Remove**, or use Up/Down and Enter while searching. Previous/Next and the wheel page
 through results. Only eight result rows are rendered at once, with fewer in short viewports.
+Holding Enter does not repeat Add/Remove; cursor/edit keys and Tab focus navigation retain repeat.
 
 All changes stay in the current draft. **Apply** saves it; **Cancel**, Escape or focus
 loss discards it. Searching changes no setting. If the viewport cannot fit the picker,
@@ -14,8 +15,11 @@ other text settings keep their plain text editor.
 Sources follow the existing consumer:
 
 - Xray / Blocks uses distinct block IDs from loaded registry-derived block facts.
-- Surround, Self Trap, Auto Trap, Hole Filler and Spawn Proofer / Blocks, plus Liquid
-  Filler / Whitelist and Blacklist, use loaded item IDs that have a block mapping.
+- Surround, Self Trap, Auto Trap, Hole Filler and Spawn Proofer / Blocks use loaded
+  item IDs that have a block mapping, including available nonvanilla namespaces.
+- Liquid Filler / Whitelist and Blacklist suggest only `minecraft:` block-item IDs:
+  its existing consumer checks a Minecraft-prefixed item lookup. Custom raw tokens
+  remain intact, but this picker does not change that consumer's namespace limitation.
 - Fast Use / Items uses all loaded item IDs.
 
 The catalog is built once per live resource identity from Horizon's loaded exports;
