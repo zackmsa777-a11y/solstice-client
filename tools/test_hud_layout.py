@@ -16,6 +16,10 @@ def main():
     runtime = (root / "mixins/solstice/runtime.rs").read_text(encoding="utf-8")
     start = runtime.index("pub(super) fn close_gui(")
     close_gui = runtime[start:runtime.index("// A slider's value", start)]
+    start = runtime.index("pub(super) fn key(")
+    key_release_prefix = runtime[start:runtime.index("    if !game.native_on(ID) || !game.focused", start)] + '}\n'
+    start = runtime.index("fn restore_holds(")
+    restore_holds = runtime[start:runtime.index("fn release_changed_binds(", start)]
     adapter = (root / "mixins/solstice/hud_editor.rs").read_text(encoding="utf-8")
     start = adapter.index("pub(super) fn release(")
     release = adapter[start:adapter.index("pub(super) fn start_frame(", start)]
@@ -31,7 +35,9 @@ mod close_gui_tests {
     struct State {
         hud_edit: Editor, hud_edit_dimension: Option<String>,
         gui: Gui, binding: Option<usize>,
+        inputs: crate::solstice_bind_state::Inputs, modules: Vec<Module>,
     }
+    struct Module { on: bool }
     thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
     fn with<R>(f: impl FnOnce(&mut State) -> R) -> R {
         STATE.with(|state| f(&mut state.borrow_mut()))
@@ -58,8 +64,12 @@ mod close_gui_tests {
         fn capture(&mut self, captured: bool) { assert!(captured); self.captures += 1; }
     }
     fn save(game: &mut Game<'_>) { game.saves += 1; }
+    fn sync_flags(_: &State) {}
     mod solstice {
         pub(super) fn close_gui(game: &mut super::Game<'_>) { super::close_gui(game); }
+    }
+    mod hud_editor {
+        pub(super) fn release(game: &mut super::Game<'_>, key: &str) { super::release(game, key); }
     }
     fn game() -> Game<'static> {
         Game {
@@ -80,7 +90,7 @@ mod close_gui_tests {
             state.gui.open = true;
         });
     }
-''' + close_gui + release + r'''
+''' + close_gui + release + restore_holds + key_release_prefix + r'''
     #[test]
     fn closing_only_recaptures_a_focused_enabled_client_in_a_live_world() {
         for flags in 0..32 {
@@ -127,6 +137,25 @@ mod close_gui_tests {
         assert_eq!(game.captures, 0);
     }
     #[test]
+    fn actual_integrated_key_release_restores_hold_and_finishes_hud_drag() {
+        start_drag();
+        with(|state| {
+            state.modules.push(Module { on: true });
+            state.inputs.hold(0, "key.mouse.left", false);
+        });
+        let mut game = game();
+        key(&mut game, "key.mouse.left", false);
+        with(|state| {
+            assert!(!state.modules[0].on);
+            assert_eq!(state.hud_edit.place(Group::Info, [150.0, 22.0], [2.0, 16.0]), [122.0, 76.0]);
+            assert!(state.hud_edit.active());
+        });
+        game.cursor = (390.0, 280.0);
+        key(&mut game, "key.mouse.left", false);
+        with(|state| assert_eq!(state.hud_edit.place(Group::Info, [150.0, 22.0], [2.0, 16.0]), [122.0, 76.0]));
+        assert_eq!(game.saves, 0);
+    }
+    #[test]
     fn actual_release_adapter_cancels_on_resize_before_the_next_hud_frame() {
         start_drag();
         let mut game = game();
@@ -162,7 +191,8 @@ mod close_gui_tests {
     with tempfile.TemporaryDirectory(prefix="sunset-hud-tests-") as directory:
         directory = Path(directory)
         wrapper = directory / "tests.rs"
-        wrapper.write_text(f'#[path = "{source.as_posix()}"] mod hud_layout;\n' + fixture, encoding="utf-8")
+        binds = root / "mixins/solstice/bind_state.rs"
+        wrapper.write_text(f'#[path = "{source.as_posix()}"] mod hud_layout;\n#[path = "{binds.as_posix()}"] mod solstice_bind_state;\n' + fixture, encoding="utf-8")
         binary = directory / ("hud-layout-tests.exe" if os.name == "nt" else "hud-layout-tests")
         subprocess.run([args.rustc, "--edition=2024", "--test", str(wrapper), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)

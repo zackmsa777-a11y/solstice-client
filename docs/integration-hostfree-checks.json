@@ -7,8 +7,8 @@
     "bind_event.rs",
     "text_event.rs"
   ],
-  "executed_test_instances": 142,
-  "unique_test_identities": 88,
+  "executed_test_instances": 158,
+  "unique_test_identities": 94,
   "shared_model_counting": "Repeated bind/input, draft, picker and HUD model tests are deduplicated by production source and test name.",
   "suites": [
     {
@@ -49,16 +49,16 @@
       "passed": 15,
       "test_identities": [
         "text-settings::runtime::tests::logical_navigation_drives_the_production_draft",
-        "bind_state.rs::tests::aliases_match_host_mouse_names_and_keyboard_defaults",
         "text-settings::runtime::tests::command_parse_still_trims_and_nontext_config_rules_are_unchanged",
-        "text_edit.rs::tests::draft_and_cancel_do_not_change_the_original",
+        "bind_state.rs::tests::aliases_match_host_mouse_names_and_keyboard_defaults",
+        "bind_state.rs::tests::hold_release_restores_manual_state_and_never_persists_temporary_on",
         "bind_state.rs::tests::missing_release_is_recovered_from_physical_state",
         "bind_state.rs::tests::only_direct_state_effects_offer_hold_activation",
-        "bind_state.rs::tests::rebinding_or_changing_mode_releases_only_its_owned_hold",
         "text-settings::runtime::tests::explicit_apply_survives_real_config_serializer_and_loader",
+        "bind_state.rs::tests::rebinding_or_changing_mode_releases_only_its_owned_hold",
         "bind_state.rs::tests::repeated_presses_do_not_toggle_again_and_release_rearms",
-        "bind_state.rs::tests::hold_release_restores_manual_state_and_never_persists_temporary_on",
         "bind_state.rs::tests::suspension_releases_holds_and_requires_a_new_press",
+        "text_edit.rs::tests::draft_and_cancel_do_not_change_the_original",
         "bind_state.rs::tests::screen_closing_press_and_focus_synthetic_press_stay_blocked",
         "text_edit.rs::tests::edits_both_sides_of_caret_and_selection",
         "text_edit.rs::tests::unicode_scalar_boundaries_survive_navigation_and_deletion",
@@ -70,13 +70,13 @@
       "exit_code": 0,
       "passed": 9,
       "test_identities": [
-        "bind_state.rs::tests::only_direct_state_effects_offer_hold_activation",
         "bind_state.rs::tests::aliases_match_host_mouse_names_and_keyboard_defaults",
-        "bind_state.rs::tests::rebinding_or_changing_mode_releases_only_its_owned_hold",
         "bind_state.rs::tests::hold_release_restores_manual_state_and_never_persists_temporary_on",
-        "bind_state.rs::tests::missing_release_is_recovered_from_physical_state",
-        "bind_state.rs::tests::repeated_presses_do_not_toggle_again_and_release_rearms",
         "bind_state.rs::tests::screen_closing_press_and_focus_synthetic_press_stay_blocked",
+        "bind_state.rs::tests::only_direct_state_effects_offer_hold_activation",
+        "bind_state.rs::tests::rebinding_or_changing_mode_releases_only_its_owned_hold",
+        "bind_state.rs::tests::repeated_presses_do_not_toggle_again_and_release_rearms",
+        "bind_state.rs::tests::missing_release_is_recovered_from_physical_state",
         "bind_state.rs::tests::suspension_releases_holds_and_requires_a_new_press",
         "binds::production_setting::unavailable_hold_uses_production_setting_error_path"
       ]
@@ -84,23 +84,37 @@
     {
       "suite": "hud-layout",
       "exit_code": 0,
-      "passed": 9,
+      "passed": 23,
       "test_identities": [
-        "hud-layout::close_gui_tests::closing_only_recaptures_a_focused_enabled_client_in_a_live_world",
-        "hud_layout.rs::tests::drag_uses_measured_box_and_preserves_grab_offset",
+        "hud-layout::close_gui_tests::actual_release_adapter_cancels_on_resize_before_the_next_hud_frame",
+        "hud-layout::close_gui_tests::actual_integrated_key_release_restores_hold_and_finishes_hud_drag",
+        "hud-layout::close_gui_tests::actual_release_adapter_rejects_lost_lifecycle_contexts",
+        "hud-layout::close_gui_tests::actual_release_adapter_finishes_a_fast_drag_once_at_the_release_cursor",
         "hud_layout.rs::tests::default_keeps_host_reservations_exactly",
+        "hud-layout::close_gui_tests::closing_only_recaptures_a_focused_enabled_client_in_a_live_world",
         "hud_layout.rs::tests::apply_is_explicit_reset_is_draft_only",
-        "hud_layout.rs::tests::manual_positions_clamp_then_keep_nearest_edge_on_resize",
         "hud_layout.rs::tests::release_resize_reset_and_cancel_do_not_leak_drags",
+        "hud_layout.rs::tests::resize_before_release_cancels_the_old_grab_offset",
+        "hud_layout.rs::tests::drag_uses_measured_box_and_preserves_grab_offset",
         "hud_layout.rs::tests::strict_schema_rejects_bad_or_unbounded_positions",
+        "hud_layout.rs::tests::manual_positions_clamp_then_keep_nearest_edge_on_resize",
         "hud_layout.rs::tests::toolbar_wins_overlap_and_keyboard_never_changes_modules",
-        "hud_layout.rs::tests::topmost_measured_group_wins_and_invalid_input_is_ignored"
+        "hud_layout.rs::tests::fast_release_commits_last_pointer_once_without_an_intermediate_frame",
+        "hud_layout.rs::tests::topmost_measured_group_wins_and_invalid_input_is_ignored",
+        "bind_state.rs::tests::aliases_match_host_mouse_names_and_keyboard_defaults",
+        "bind_state.rs::tests::hold_release_restores_manual_state_and_never_persists_temporary_on",
+        "bind_state.rs::tests::only_direct_state_effects_offer_hold_activation",
+        "bind_state.rs::tests::missing_release_is_recovered_from_physical_state",
+        "bind_state.rs::tests::rebinding_or_changing_mode_releases_only_its_owned_hold",
+        "bind_state.rs::tests::repeated_presses_do_not_toggle_again_and_release_rearms",
+        "bind_state.rs::tests::screen_closing_press_and_focus_synthetic_press_stay_blocked",
+        "bind_state.rs::tests::suspension_releases_holds_and_requires_a_new_press"
       ]
     },
     {
       "suite": "integration-events",
       "exit_code": 0,
-      "passed": 38,
+      "passed": 40,
       "test_identities": [
         "integration-events::runtime::cancelling_text_consumes_escape_without_rearming_its_bind",
         "integration-events::runtime::focus_loss_cancels_draft_and_releases_owned_hold",
@@ -121,8 +135,10 @@
         "hud_layout.rs::tests::apply_is_explicit_reset_is_draft_only",
         "hud_layout.rs::tests::default_keeps_host_reservations_exactly",
         "hud_layout.rs::tests::drag_uses_measured_box_and_preserves_grab_offset",
+        "hud_layout.rs::tests::fast_release_commits_last_pointer_once_without_an_intermediate_frame",
         "hud_layout.rs::tests::manual_positions_clamp_then_keep_nearest_edge_on_resize",
         "hud_layout.rs::tests::release_resize_reset_and_cancel_do_not_leak_drags",
+        "hud_layout.rs::tests::resize_before_release_cancels_the_old_grab_offset",
         "hud_layout.rs::tests::strict_schema_rejects_bad_or_unbounded_positions",
         "hud_layout.rs::tests::toolbar_wins_overlap_and_keyboard_never_changes_modules",
         "hud_layout.rs::tests::topmost_measured_group_wins_and_invalid_input_is_ignored",
@@ -170,20 +186,20 @@
       "exit_code": 0,
       "passed": 14,
       "test_identities": [
-        "registry_picker.rs::tests::actual_consumer_policy_separates_blocks_block_items_and_plain_text",
         "registry_picker.rs::tests::catalog_cache_builds_only_for_a_new_live_resource_identity",
+        "registry_picker.rs::tests::actual_consumer_policy_separates_blocks_block_items_and_plain_text",
         "registry_picker.rs::tests::catalog_deduplicates_state_variants_without_inventing_block_items",
         "registry_picker.rs::tests::compact_panel_bounds_rows_and_falls_back_to_raw_for_tiny_viewports",
-        "registry_picker.rs::tests::liquid_filler_suggestions_follow_its_vanilla_lookup_without_discarding_raw_tokens",
         "registry_picker.rs::tests::production_enter_action_ignores_repeat_without_changing_navigation_or_mouse_toggle",
-        "registry_picker.rs::tests::search_byte_limit_rejects_whole_insert_and_allows_recovery",
+        "registry_picker.rs::tests::liquid_filler_suggestions_follow_its_vanilla_lookup_without_discarding_raw_tokens",
+        "registry_picker.rs::tests::explicit_toggle_preserves_unknown_tokens_namespaces_order_and_whitespace",
         "registry_picker.rs::tests::picker_changes_only_draft_and_failed_inserts_never_truncate",
+        "registry_picker.rs::tests::search_byte_limit_rejects_whole_insert_and_allows_recovery",
+        "text_edit.rs::tests::draft_and_cancel_do_not_change_the_original",
         "registry_picker.rs::tests::search_is_separate_cached_bounded_and_keyboard_pages_are_reachable",
         "text_edit.rs::tests::edits_both_sides_of_caret_and_selection",
-        "text_edit.rs::tests::draft_and_cancel_do_not_change_the_original",
-        "text_edit.rs::tests::rejects_invalid_or_oversized_input_atomically",
-        "registry_picker.rs::tests::explicit_toggle_preserves_unknown_tokens_namespaces_order_and_whitespace",
-        "text_edit.rs::tests::unicode_scalar_boundaries_survive_navigation_and_deletion"
+        "text_edit.rs::tests::unicode_scalar_boundaries_survive_navigation_and_deletion",
+        "text_edit.rs::tests::rejects_invalid_or_oversized_input_atomically"
       ]
     },
     {
@@ -197,11 +213,11 @@
       "exit_code": 0,
       "passed": 8,
       "test_identities": [
-        "block-scan::hard_cell_budget_and_batched_deadline",
         "block-scan::finite_and_integer_extremes_are_safe",
-        "block-scan::result_cap_publishes_original_prefix",
+        "block-scan::hard_cell_budget_and_batched_deadline",
         "block-scan::ordinary_walking_completes_fixed_center_and_queues_latest_pose",
         "block-scan::completed_results_stay_coherent_while_refreshing",
+        "block-scan::result_cap_publishes_original_prefix",
         "block-scan::stable_center_waits_100_ticks_after_publication_or_six_blocks",
         "block-scan::cancel_config_dimension_and_teleport_clear_partial_and_published_results",
         "block-scan::exact_old_enumeration_and_no_duplicates_for_all_ranges_and_y_clamps"
@@ -219,9 +235,9 @@
       "passed": 4,
       "test_identities": [
         "armor::armor_model::tests::actual_custom_max_and_damage_determine_remaining",
-        "armor::armor_model::tests::all_equipment_statuses_are_explicit",
         "armor::armor_model::tests::visibility_requires_every_gate",
-        "armor::armor_model::tests::malformed_or_out_of_range_values_never_become_plausible_durability"
+        "armor::armor_model::tests::malformed_or_out_of_range_values_never_become_plausible_durability",
+        "armor::armor_model::tests::all_equipment_statuses_are_explicit"
       ]
     },
     {
@@ -235,16 +251,16 @@
       "exit_code": 0,
       "passed": 10,
       "test_identities": [
-        "low-health::death_lifecycle_and_disable_gates_clear_adapter_latch",
-        "low-health::server_game_cannot_load_or_reset_the_window_latch",
-        "low-health::solstice_low_health_model::tests::nonfinite_and_out_of_bounds_inputs_reset_safely",
-        "low-health::solstice_low_health_model::tests::setting_changes_recompute_instead_of_inheriting_old_latch",
-        "low-health::solstice_low_health_model::tests::enters_at_threshold_and_recovers_above_hysteresis_boundary",
-        "low-health::solstice_low_health_model::tests::lifecycle_and_disable_gaps_reset_the_latch",
         "low-health::base_health_and_hidden_hud_updates_flow_through_actual_adapter",
+        "low-health::death_lifecycle_and_disable_gates_clear_adapter_latch",
+        "low-health::disabled_native_never_loads_saved_module_flags_and_resets_only_warning",
+        "low-health::server_game_cannot_load_or_reset_the_window_latch",
+        "low-health::solstice_low_health_model::tests::lifecycle_and_disable_gaps_reset_the_latch",
+        "low-health::solstice_low_health_model::tests::enters_at_threshold_and_recovers_above_hysteresis_boundary",
         "low-health::solstice_low_health_model::tests::steady_warning_and_zero_hysteresis_have_no_boundary_oscillation",
+        "low-health::solstice_low_health_model::tests::nonfinite_and_out_of_bounds_inputs_reset_safely",
         "low-health::solstice_low_health_model::tests::hiding_the_hud_does_not_discard_health_transitions",
-        "low-health::disabled_native_never_loads_saved_module_flags_and_resets_only_warning"
+        "low-health::solstice_low_health_model::tests::setting_changes_recompute_instead_of_inheriting_old_latch"
       ]
     },
     {
@@ -258,12 +274,12 @@
       "exit_code": 0,
       "passed": 6,
       "test_identities": [
-        "radar::radar_math::tests::north_up_and_heading_up_match_minecraft_cardinal_yaws",
         "radar::radar_math::tests::circle_tessellation_tracks_device_resolution_with_bounded_chord_error",
-        "radar::radar_math::tests::requested_size_fits_small_viewports_without_mutating_settings",
-        "radar::radar_math::tests::range_is_horizontal_inclusive_and_rejects_invalid_coordinates",
         "radar::radar_math::tests::cached_circle_vertices_are_closed_and_not_quantized_to_gui_scanlines",
-        "radar::radar_math::tests::edge_width_is_one_physical_pixel_at_fractional_and_integer_gui_scales"
+        "radar::radar_math::tests::edge_width_is_one_physical_pixel_at_fractional_and_integer_gui_scales",
+        "radar::radar_math::tests::north_up_and_heading_up_match_minecraft_cardinal_yaws",
+        "radar::radar_math::tests::range_is_horizontal_inclusive_and_rejects_invalid_coordinates",
+        "radar::radar_math::tests::requested_size_fits_small_viewports_without_mutating_settings"
       ]
     }
   ],
@@ -290,8 +306,8 @@
     "mixins/solstice/frame.rs": "9950995e732ba209631ec3a75aa8ea9931e724e32a3bf9458b29f4617be885e2",
     "mixins/solstice/horizon-mixin.toml": "a7a099708534cb77cc8284587292ca26191917b7c7fbad5ac5211471a5c026df",
     "mixins/solstice/hud.rs": "b1c29cd5e0247a048fe9a120f3faca0fc2909ef83cc3ce5b845635ecce0c3a08",
-    "mixins/solstice/hud_editor.rs": "32ddb1cd314dd734405df19be885905108f81c0c55180a0e78b53da638b64ac8",
-    "mixins/solstice/hud_layout.rs": "b25a9b84d126ea8977a3025fcd74da24df7626dc708b6dda55381163b6bc85a6",
+    "mixins/solstice/hud_editor.rs": "1a3245a8cac270a8999f55d4b2b3ce1b8a09ba39376817b6ee4c40c1d5392d76",
+    "mixins/solstice/hud_layout.rs": "812744b2b8bea5d02f79efb5f61cb947e537dd90b7d6a088e619d7708fa15fad",
     "mixins/solstice/input.rs": "7606c764b7f9c12607c58da5215e243ce56f0804dbd8adc033a40ad6f29cd450",
     "mixins/solstice/input_flags.rs": "ad0b24e5f78c9c4bc7d4d84c8525bcd39c758c0fe9fb66982cfd3f4560692c10",
     "mixins/solstice/key.rs": "49d4914a9ea739059376b1ea5f6704d06d30a3862b20bc820d11c57a6d0c7fe0",
@@ -314,7 +330,7 @@
     "mixins/solstice/registry_picker.rs": "3f32d94c546311ebf8964a2af868350695f819827730e823808fc40e4969d2de",
     "mixins/solstice/remote_seq.rs": "8bb8692ac02081cf46def2c3353dc828e718b74babebfe522a8091b7fd599973",
     "mixins/solstice/render.rs": "2020eb5f3cefda915833ea7cc5579ef934f886ba8d6842ee66034e4774e1de33",
-    "mixins/solstice/runtime.rs": "9c2153a706f98dbeda8c719de4825e094751925d8d0a6eb8c317d6aee44d6667",
+    "mixins/solstice/runtime.rs": "8f54cb42ca8d41fb242c1e289677cb9bb1e273ac81e2ad1d04fb707a4ddbf0d3",
     "mixins/solstice/scan.rs": "c8ea8cf4b7d95075ebec13f30ddd5c528c72d069546de0937a044987b82da655",
     "mixins/solstice/scan_reset.rs": "90925633d8f4545976df5b8e6763aa5c36dcb9ee3a2a8a67a77a37c6f21b3ab6",
     "mixins/solstice/send.rs": "cb8d93bf8f35d3307f3e3dea4686c2cfa05e60454e5576f90fc0886679c0489a",
@@ -348,7 +364,7 @@
     "tools/pack.py": "8940c43c67df51750129928387b918f45b57d1617c724f25d7c1680cc7149294",
     "tools/shots.py": "2623c87f7f550345e56d54369cd510fe6b58a38d3d97226133d2a91acd5fcf9b",
     "tools/test_binds.py": "2d00375732761e8744f8f239b9dc5a2c4bc57223e00ba17d3945787284e0bff6",
-    "tools/test_hud_layout.py": "7d43e9aef7cf32a22fb6059c3fc89ea6197545b7a63b32d4d60962b08a1bf6c8",
+    "tools/test_hud_layout.py": "7d5e624993a4f7f8377de23114ebd9e77e1803661be1c926bfba6b3dd5704584",
     "tools/test_integration.py": "0a67d22e29f2de17c8fee44fd87d6e6cdfb657c1634c0e054da902083ba91681",
     "tools/test_integration_events.py": "8ec1e266dd6f2a785afdc456af36730550ea5c16a6a0cf19bdecc81dbf72feef",
     "tools/test_profiles.py": "753186fbf43d8cfb4898bd46b5a99f9ab190a22914923fbd9a00ff00ed111352",

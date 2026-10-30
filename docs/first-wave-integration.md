@@ -8,7 +8,7 @@ The source commits are retained as separate cherry-picks with original commit
 references: Radar `b33ffa0`; profiles `e44f9ce` and `561500d`; text editing
 `574bbcf`, `d478c7b`, and its runtime evidence `de88ce5`; binds `d0f0109`
 and the visible-value label follow-up `eccd1d5`;
-HUD positioning `b5bc5f9` and `9ffa6df`; bounded scans `5b3406e`; Armor
+HUD positioning `b5bc5f9`, `9ffa6df`, and fast-drag release correction `f7c8ba4`; bounded scans `5b3406e`; Armor
 Durability `5a1c06a`; Low Health `d0db40b`; and the registry picker `9a4c435`
 with its review correction `c06dc09`. Feature source branches remain
 unchanged. Integration-only commits hold the composition fixes and tests.
@@ -21,6 +21,10 @@ unchanged. Integration-only commits hold the composition fixes and tests.
 - Frame conflicts preserve bind synchronization, HUD editor lifecycle,
   block-scan lifecycle, Low Health sampling, and the existing render callback.
   The Low Health native-disabled guard remains ahead of config loading.
+- The native key-release branch restores owned Hold state and then delegates
+  to the HUD release adapter before returning. A fast drag commits its final
+  observed release cursor to the draft once; resize and lost lifecycle contexts
+  still cancel it. Release never acts as Apply or persists HUD positions.
 - The profiles serializer iterates the proposed module clone with its existing
   module indices. It uses `Inputs.saved_on(index, proposed.on)` when persisting
   enabled states, so a temporary Hold does not become a saved enabled module.
@@ -74,6 +78,10 @@ The event harness does not extract `gui_key`, native/mapped-key handling, or
 actual window dispatch. Its modifier fixture is neutral; Ctrl/Alt behavior
 remains covered by source review and separate feature validation, not this
 composition event harness.
+The HUD suite separately extracts the actual native key-release prefix,
+Hold restoration, HUD release adapter, and close handler. Its combined
+regression verifies both Hold restoration and final drag placement in the same
+release call, without claiming complete native-key/window dispatch coverage.
 
 Integration preparation does not stage the AST, invoke Cargo, build or launch
 a game, push a branch, or create a PR. The owner performs the final fresh AST
