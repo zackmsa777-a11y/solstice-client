@@ -227,7 +227,7 @@ pub(super) fn tick(game: &mut Game<'_>, mods: &[Module], ticks: u64) {
     // Freecam moves a camera each tick; Meteor's speed is blocks a tick, half
     // of it, the whole of it while sprinting.
     if let Some(m) = on(mods, "Freecam") {
-        let playing = game.native_playing();
+        let playing = game.native_playing() && !super::solstice::gui_open();
         let keys = game.physical_keys.clone();
         let health = game.player.as_ref().map_or(20.0, |p| p.health.health());
         let gone = game.remote.is_none();
@@ -289,7 +289,7 @@ pub(super) fn tick(game: &mut Game<'_>, mods: &[Module], ticks: u64) {
     }
     // Free Look's arrow keys.
     if let Some(m) = on(mods, "Free Look") {
-        if m.b("Arrows") && game.native_playing() {
+        if m.b("Arrows") && game.native_playing() && !super::solstice::gui_open() {
             let keys = game.physical_keys.clone();
             let n = m.n("Arrow speed") * 2.0;
             let d = |neg: KeyCode, pos: KeyCode| (f32::from(u8::from(keys.contains(&pos))) - f32::from(u8::from(keys.contains(&neg)))) * 0.5 * n as f32;

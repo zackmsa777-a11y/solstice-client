@@ -8,6 +8,7 @@
 
 use super::{Game, Screen};
 use super::solstice_visual::{distance_colour, draw_box, entity_colour, faded};
+use super::{solstice_hud_editor as hud_editor, solstice_hud_layout::Group as HudGroup};
 use horizon_client::extras::Corner;
 use horizon_client::extras_hud::Corners;
 use horizon_client::hud::HudBatch;
@@ -481,6 +482,8 @@ pub(super) struct State {
     // the next one is the server's push (Velocity).
     velocity: Option<[f64; 3]>,
     gui: Gui,
+    pub(super) hud_edit: super::solstice_hud_layout::Editor,
+    pub(super) hud_edit_dimension: Option<String>,
     crumbs: Vec<[f64; 3]>,
     waypoints: Vec<Waypoint>,
     // Block ESP's finds: where, and which colour; and when and for what it was made.
@@ -543,6 +546,8 @@ impl State {
             totem_from: None,
             velocity: None,
             gui: Gui::default(),
+            hud_edit: super::solstice_hud_layout::Editor::default(),
+            hud_edit_dimension: None,
             crumbs: Vec::new(),
             waypoints: Vec::new(),
             found: Vec::new(),
@@ -716,6 +721,7 @@ pub(super) fn ensure_loaded(game: &Game<'_>) {
         s.loaded = true;
         sync_flags(s);
     });
+    hud_editor::load(game);
 }
 
 pub(super) fn save(game: &Game<'_>) {
@@ -828,7 +834,7 @@ pub(super) fn own_id(game: &Game<'_>) -> Option<u32> {
 
 // The move keys held now: forward minus back, left minus right.
 pub(super) fn move_input(game: &Game<'_>) -> (f64, f64) {
-    if !game.native_playing() {
+    if !game.native_playing() || gui_open() {
         return (0.0, 0.0);
     }
     let held = |k: KeyCode| f64::from(u8::from(game.keys.contains(&k)));
@@ -1123,7 +1129,7 @@ pub(super) fn pre_tick(game: &mut Game<'_>) {
     super::solstice_render::pre_tick(game, &mods);
     let on = |n: &str| mods.iter().any(|m| m.name == n && m.on);
     let get = |n: &str| mods.iter().find(|m| m.name == n).cloned();
-    let playing = game.native_playing();
+    let playing = game.native_playing() && !gui_open();
     // The click GUI holds no movement keys, as a screen would.
     if gui_open() {
         game.keys.clear();
@@ -2541,6 +2547,7 @@ pub(super) fn chat(game: &mut Game<'_>, message: &str) -> bool {
 
 const HELP: &[(&str, &str)] = &[
     (".menu", "open the click GUI (or press Right Shift)"),
+    (".hudedit", "drag visible HUD groups; Apply, Cancel or Reset positions"),
     (".pages", "the same settings as pages in Options > Mods"),
     (".toggle <module>", "turn a module on or off (.t)"),
     (".modules", "list every module"),
@@ -2583,6 +2590,19 @@ pub(super) fn run(game: &mut Game<'_>, args: &[&str]) {
             open_gui(game);
         }
         "pages" => open_menu(game),
+        "hudedit" => {
+            if game.ui.hide_gui {
+                say(game, "Show the HUD with F1 before editing positions.");
+            } else {
+                open_gui(game);
+                if gui_open() {
+                    with(|s| {
+                        s.hud_edit.begin();
+                        s.hud_edit_dimension = Some(game.dim.id().to_owned());
+                    });
+                }
+            }
+        }
         "toggle" | "t" => {
             if let Some(i) = module_arg(game, args.get(1)) {
                 toggle(game, i, true);
@@ -2914,6 +2934,7 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
     let mods = snapshot();
     let get = |n: &str| mods.iter().find(|m| m.name == n && m.on);
     let (w, h) = (batch.width, batch.height);
+    hud_editor::start_frame(game, [w, h]);
     let lw = (1.5 / batch.scale).max(0.5);
     let mut shapes = Vec::new();
 
@@ -2924,13 +2945,14 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
     }
 
     if let Some(hud) = get("HUD") {
-        if hud.b("Watermark") && game.native_corner_shown(Corner::TopLeft) {
+        if hud.b("Watermark") {
             let text = format!("{NAME} {VERSION}");
             let tw = game.native_text_width(&text);
-            let (x, y) = corners.place(Corner::TopLeft, tw + 4.0, 12.0);
-            shapes.push(Shape::Text(text, [x + 2.0, y + 2.0], ACCENT));
+            if let Some([x, y]) = hud_editor::place(game, corners, HudGroup::Watermark, Corner::TopLeft, [tw + 4.0, 12.0]) {
+                shapes.push(Shape::Text(text, [x + 2.0, y + 2.0], ACCENT));
+            }
         }
-        if hud.b("Module list") && game.native_corner_shown(Corner::TopRight) {
+        if hud.b("Module list") {
             let mut lines: Vec<String> = mods
                 .iter()
                 .filter(|m| m.on && m.name != "HUD")
@@ -2943,17 +2965,16 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
             let mut order: Vec<usize> = (0..lines.len()).collect();
             order.sort_by(|&a, &b| widths[b].total_cmp(&widths[a]));
             let max = widths.iter().copied().fold(0.0, f32::max);
-            if !lines.is_empty() {
-                let (x, y) = corners.place(Corner::TopRight, max + 4.0, lines.len() as f32 * 10.0 + 2.0);
+            if !lines.is_empty()
+                && let Some([x, y]) = hud_editor::place(game, corners, HudGroup::Modules, Corner::TopRight, [max + 4.0, lines.len() as f32 * 10.0 + 2.0])
+            {
                 for (row, &i) in order.iter().enumerate() {
                     let text = std::mem::take(&mut lines[i]);
                     shapes.push(Shape::Text(text, [x + max + 2.0 - widths[i], y + 2.0 + row as f32 * 10.0], 0xFFFFFF));
                 }
             }
         }
-        if game.native_corner_shown(Corner::TopLeft)
-            && let Some(p) = game.native_player()
-        {
+        if let Some(p) = game.native_player() {
             let mut lines: Vec<String> = Vec::new();
             if hud.b("Coordinates") {
                 let (x, y, z) = (p.x.floor(), p.y.floor(), p.z.floor());
@@ -2990,8 +3011,9 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
                 lines.push(info.join("  "));
             }
             let width = lines.iter().map(|l| game.native_text_width(l)).fold(0.0, f32::max);
-            if !lines.is_empty() {
-                let (bx, by) = corners.place(Corner::TopLeft, width + 4.0, lines.len() as f32 * 10.0 + 2.0);
+            if !lines.is_empty()
+                && let Some([bx, by]) = hud_editor::place(game, corners, HudGroup::Info, Corner::TopLeft, [width + 4.0, lines.len() as f32 * 10.0 + 2.0])
+            {
                 for (i, line) in lines.into_iter().enumerate() {
                     shapes.push(Shape::Text(line, [bx + 2.0, by + 2.0 + i as f32 * 10.0], 0xFFFFFF));
                 }
@@ -3004,11 +3026,16 @@ pub(super) fn hud(game: &mut Game<'_>, batch: &mut HudBatch, corners: &mut Corne
     }
     if with(|s| s.gui.open) {
         if game.screen == Screen::Playing && game.player.is_some() {
-            draw_gui(game, w, h, &mut shapes);
+            if with(|s| s.hud_edit.active()) {
+                hud_editor::draw(game, [w, h], &mut shapes);
+            } else {
+                draw_gui(game, w, h, &mut shapes);
+            }
         } else {
             with(|s| {
                 s.gui.open = false;
                 s.gui.drag = None;
+                s.hud_edit.cancel();
             });
         }
     }
@@ -3509,6 +3536,7 @@ pub(super) fn gui_rows(s: &State) -> Vec<([f32; 4], Hit)> {
 
 // The wheel over a panel scrolls it.
 pub(super) fn gui_wheel(game: &Game<'_>, steps: f32) {
+    if with(|s| s.hud_edit.active()) { return; }
     let at = game.cursor;
     with(|s| {
         for c in 0..CATEGORIES.len() {
@@ -3541,6 +3569,8 @@ pub(super) fn open_gui(game: &mut Game<'_>) {
     game.keys.clear();
     game.capture(false);
     with(|s| {
+        s.hud_edit.cancel();
+        s.hud_edit_dimension = None;
         s.gui.open = true;
         s.gui.closing = false;
         s.gui.drag = None;
@@ -3550,6 +3580,8 @@ pub(super) fn open_gui(game: &mut Game<'_>) {
 
 pub(super) fn close_gui(game: &mut Game<'_>) {
     with(|s| {
+        s.hud_edit.cancel();
+        s.hud_edit_dimension = None;
         s.gui.open = false;
         s.gui.closing = false;
         s.gui.drag = None;
@@ -3583,6 +3615,10 @@ pub(super) fn gui_open() -> bool {
 // A key while the GUI is open: a bind being chosen, or Esc and the menu key
 // closing it. Every key stops here.
 pub(super) fn gui_key(game: &mut Game<'_>, name: &str) {
+    if with(|s| s.hud_edit.active()) {
+        with(|s| s.hud_edit.key(name, game.modifiers.shift_key(), is_menu_key(game, name)));
+        return;
+    }
     if let Some(i) = with(|s| s.binding) {
         let chosen = match name {
             "key.keyboard.escape" => {
@@ -3687,6 +3723,12 @@ pub(super) fn key_char(name: &str) -> Option<char> {
 pub(super) fn gui_press(game: &mut Game<'_>, button: winit::event::MouseButton) {
     use winit::event::MouseButton;
     let at = game.cursor;
+    if with(|s| s.hud_edit.active()) {
+        if button == MouseButton::Left {
+            with(|s| s.hud_edit.press([at.0, at.1]));
+        }
+        return;
+    }
     let right = match button {
         MouseButton::Left => false,
         MouseButton::Right => true,

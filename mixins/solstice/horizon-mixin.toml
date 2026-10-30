@@ -21,6 +21,18 @@ name = "solstice_util"
 source = "util.rs"
 
 [[module]]
+id = "hud_layout"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_hud_layout"
+source = "hud_layout.rs"
+
+[[module]]
+id = "hud_editor"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_hud_editor"
+source = "hud_editor.rs"
+
+[[module]]
 id = "combat"
 file = "crates/horizon-client/src/game.rs"
 name = "solstice_combat"
