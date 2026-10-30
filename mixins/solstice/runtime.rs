@@ -483,10 +483,8 @@ pub(super) struct State {
     gui: Gui,
     crumbs: Vec<[f64; 3]>,
     waypoints: Vec<Waypoint>,
-    // Block ESP's finds: where, and which colour; and when and for what it was made.
-    found: Vec<([i32; 3], u32)>,
-    found_for: (usize, i32, [i32; 3]),
-    found_at: u64,
+    // Block ESP publishes only complete bounded scan cycles.
+    block_scan: super::solstice_scan::Scan,
     afk_wait: u32,
     scaffold_wait: u32,
     click_wait: u32,
@@ -545,9 +543,7 @@ impl State {
             gui: Gui::default(),
             crumbs: Vec::new(),
             waypoints: Vec::new(),
-            found: Vec::new(),
-            found_for: (usize::MAX, 0, [0; 3]),
-            found_at: 0,
+            block_scan: super::solstice_scan::Scan::default(),
             afk_wait: 0,
             scaffold_wait: 0,
             click_wait: 0,
@@ -1256,6 +1252,7 @@ pub(super) fn post_tick(game: &mut Game<'_>) {
     }
 
     if game.player.is_none() {
+        clear_block_scan();
         return;
     }
 
@@ -1579,10 +1576,7 @@ pub(super) fn post_tick(game: &mut Game<'_>) {
     if let Some(m) = get("Block ESP") {
         scan_blocks(game, m, ticks);
     } else {
-        with(|s| {
-            s.found.clear();
-            s.found_at = 0;
-        });
+        clear_block_scan();
     }
     super::solstice_combat::tick(game, &mods);
     super::solstice_render::tick(game, &mods, ticks);
@@ -1830,50 +1824,38 @@ pub(super) fn block_colour(preset: &str, name: &str) -> Option<u32> {
     }
 }
 
-// Block ESP's search of the loaded blocks around the player: again when the
-// player has moved, the settings changed, or it has been a while.
-pub(super) fn scan_blocks(game: &Game<'_>, m: &Module, ticks: u64) {
-    let Some(p) = game.player.as_ref() else {
-        return;
+// Read-only loaded-world pilot: at most 4096 cells/tick, 1 ms checked every 64.
+// A slow individual read/batch can exceed the time target; the cell cap is hard.
+pub(super) fn clear_block_scan() {
+    with(|s| s.block_scan.clear());
+}
+fn block_request(game: &Game<'_>, m: &Module) -> Option<super::solstice_scan::Request> {
+    use super::solstice_scan::{Request, scan_center, scan_range};
+    let p = game.native_player()?;
+    let preset = match m.p("Blocks") {
+        "Ores" => 0, "Diamond" => 1, "Ancient Debris" => 2, "Spawners" => 3, _ => 4,
     };
-    let preset = m.p("Blocks");
-    let key = match preset {
-        "Ores" => 0,
-        "Diamond" => 1,
-        "Ancient Debris" => 2,
-        "Spawners" => 3,
-        _ => 4,
-    };
-    let range = m.n("Range") as i32;
-    let at = [p.position.x.floor() as i32, p.position.y.floor() as i32, p.position.z.floor() as i32];
-    let (last, last_at, last_ticks) = with(|s| (s.found_for, s.found_at, s.found_at));
-    let moved = (at[0] - last.2[0]).abs().max((at[1] - last.2[1]).abs()).max((at[2] - last.2[2]).abs());
-    if (key, range) == (last.0, last.1) && moved < 6 && ticks.saturating_sub(last_ticks) < 100 && last_at != 0 {
-        return;
-    }
-    let facts = game.res.facts();
-    let mut found = Vec::new();
-    'scan: for x in at[0] - range..=at[0] + range {
-        for z in at[2] - range..=at[2] + range {
-            for y in (at[1] - range).max(-64)..=(at[1] + range).min(320) {
-                let state = game.world.block(x, y, z);
-                if facts.is_air(state) {
-                    continue;
-                }
-                if let Some(c) = block_colour(preset, &facts.get(state).name) {
-                    found.push(([x, y, z], c));
-                    if found.len() >= 2000 {
-                        break 'scan;
-                    }
-                }
-            }
-        }
-    }
-    with(|s| {
-        s.found = found;
-        s.found_for = (key, range, at);
-        s.found_at = ticks.max(1);
+    Some(Request { dimension: p.dimension.to_owned(), preset, range: scan_range(m.n("Range"))?,
+        center: scan_center([p.x, p.y, p.z])? })
+}
+pub(super) fn block_scan_frame(game: &Game<'_>) {
+    if !game.native_window() { return; }
+    let module = with(|s| s.module("Block ESP").filter(|m| m.on).cloned());
+    let request = module.as_ref().filter(|_| game.native_on(ID)).and_then(|m| block_request(game, m));
+    with(|s| match request {
+        Some(request) => s.block_scan.observe(request),
+        None => s.block_scan.clear(),
     });
+}
+pub(super) fn scan_blocks(game: &Game<'_>, m: &Module, ticks: u64) {
+    let Some(request) = block_request(game, m) else { clear_block_scan(); return; };
+    let started = std::time::Instant::now();
+    let facts = game.res.facts();
+    let preset = m.p("Blocks");
+    with(|s| s.block_scan.tick(request, ticks, |[x, y, z]| {
+        let state = game.world.block(x, y, z);
+        if facts.is_air(state) { None } else { block_colour(preset, &facts.get(state).name) }
+    }, || started.elapsed() >= std::time::Duration::from_millis(1)));
 }
 
 // A click or several in the player's own inventory (the menu with no
@@ -3197,7 +3179,13 @@ pub(super) fn world_overlays(game: &Game<'_>, cam: &Camera, mods: &[Module], lw:
     }
 
     if let Some(m) = blocks {
-        let found = with(|s| s.found.clone());
+        let found = with(|s| {
+            match block_request(game, m) {
+                Some(request) => s.block_scan.observe(request),
+                None => s.block_scan.clear(),
+            }
+            s.block_scan.found.clone()
+        });
         let range = m.n("Range") * 1.5;
         for (pos, col) in found {
             let at = [f64::from(pos[0]) + 0.5, f64::from(pos[1]) + 0.5, f64::from(pos[2]) + 0.5];

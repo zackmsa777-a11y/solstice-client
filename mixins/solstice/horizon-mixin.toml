@@ -453,3 +453,30 @@ helper = "menu_pause_hook.rs"
 bindings = [
   { name = "in_world", ty = "bool", value = "in_world" },
 ]
+
+[[module]]
+id = "scan"
+file = "crates/horizon-client/src/game.rs"
+name = "solstice_scan"
+source = "scan.rs"
+
+[[injection]]
+id = "scan-world-reset"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_world_lifecycle"
+helper = "scan_reset.rs"
+bindings = []
+
+[[injection]]
+id = "scan-remote-leave"
+kind = "HEAD"
+target = "horizon_client::game::remote::Game<'_>::leave_server"
+helper = "scan_reset.rs"
+bindings = []
+
+[[injection]]
+id = "scan-remote-dimension"
+kind = "HEAD"
+target = "horizon_client::game::remote::Game<'_>::enter_remote_dimension"
+helper = "scan_reset.rs"
+bindings = []
