@@ -36,7 +36,7 @@ mod horizon_client { pub mod keybinds {
     }) }
     pub fn mouse_name(button: MouseButton) -> String { match button {
         MouseButton::Left => "key.mouse.left".into(), MouseButton::Right => "key.mouse.right".into(),
-        MouseButton::Other(n) => format!("key.mouse.{n}"),
+            MouseButton::Other(n) => format!("key.mouse.{}", n + 1),
     } }
 } }
 mod runtime {
@@ -145,6 +145,53 @@ mod runtime {
         text_event(&event(Key::Named(NamedKey::Home), None, true));
         text_event(&event(Key::Character("!".into()), Some("!"), true));
         with(|state| assert_eq!(state.gui.text_edit.as_ref().unwrap().draft.as_ref().unwrap().text(), "!stone"));
+    }
+
+    fn repeating(mut event: winit::event::WindowEvent) -> winit::event::WindowEvent {
+        if let winit::event::WindowEvent::KeyboardInput { event, .. } = &mut event { event.repeat = true; }
+        event
+    }
+
+    #[test]
+    fn repeated_tab_retains_the_documented_focus_navigation_policy() {
+        reset(true);
+        use winit::keyboard::{Key, NamedKey};
+        text_event(&repeating(event(Key::Named(NamedKey::Tab), None, true)));
+        with(|state| assert!(state.gui.text_edit.as_ref().unwrap().picker.as_ref().unwrap().search_focus));
+        text_event(&repeating(event(Key::Named(NamedKey::Tab), None, true)));
+        with(|state| assert!(!state.gui.text_edit.as_ref().unwrap().picker.as_ref().unwrap().search_focus));
+    }
+
+    #[test]
+    fn repeated_enter_does_not_toggle_the_registry_draft() {
+        reset(true);
+        use winit::keyboard::{Key, NamedKey};
+        text_event(&event(Key::Named(NamedKey::Tab), None, true));
+        text_event(&repeating(event(Key::Named(NamedKey::Enter), None, true)));
+        with(|state| assert_eq!(state.gui.text_edit.as_ref().unwrap().draft.as_ref().unwrap().text(), "stone"));
+        text_event(&event(Key::Named(NamedKey::Enter), None, true));
+        let once = with(|state| state.gui.text_edit.as_ref().unwrap().draft.as_ref().unwrap().text().to_owned());
+        assert_ne!(once, "stone");
+        text_event(&repeating(event(Key::Named(NamedKey::Enter), None, true)));
+        with(|state| assert_eq!(state.gui.text_edit.as_ref().unwrap().draft.as_ref().unwrap().text(), once));
+    }
+
+    #[test]
+    fn repeated_navigation_still_moves_picker_cursor_and_edits_query() {
+        reset(true);
+        use winit::keyboard::{Key, NamedKey};
+        text_event(&event(Key::Named(NamedKey::Tab), None, true));
+        text_event(&repeating(event(Key::Named(NamedKey::ArrowDown), None, true)));
+        with(|state| assert_eq!(state.gui.text_edit.as_ref().unwrap().picker.as_ref().unwrap().cursor, 1));
+        text_event(&event(Key::Character("ore".into()), Some("ore"), true));
+        text_event(&repeating(event(Key::Named(NamedKey::Home), None, true)));
+        text_event(&event(Key::Character("x".into()), Some("x"), true));
+        text_event(&repeating(event(Key::Named(NamedKey::Backspace), None, true)));
+        with(|state| {
+            let edit = state.gui.text_edit.as_ref().unwrap();
+            assert_eq!(edit.picker.as_ref().unwrap().query.text(), "ore");
+            assert_eq!(edit.draft.as_ref().unwrap().text(), "stone");
+        });
     }
 
     #[test]
