@@ -21,8 +21,9 @@ is clamped to the current viewport. Content larger than the viewport starts at
 the edge and may overflow; text is never scaled or resampled by this editor.
 A resize ends an active drag to avoid reusing an old pointer offset.
 
-F1 still hides the HUD. Editing cannot start while hidden, and hiding it ends
-the draft. Opening another screen, leaving the world, changing dimension,
+F1 hides the HUD during normal play; while the editor is open, its input gate
+consumes F1. Editing cannot start while hidden, and an external HUD visibility
+change ends the draft. Opening another screen, leaving the world, changing dimension,
 disabling the mod, or losing focus cancels editing and clears drag state.
 The editor shares the click GUI's input gate and suppresses automatic movement
 key injection, Freecam movement keys, and Free Look arrow keys in both menus.

@@ -3588,7 +3588,14 @@ pub(super) fn close_gui(game: &mut Game<'_>) {
         s.binding = None;
     });
     save(game);
-    if game.screen == Screen::Playing {
+    // Lifecycle cancellation can run after leave_server has set Playing
+    // underneath a title/disconnect screen, or after the mod was disabled.
+    if game.native_window()
+        && game.native_on(ID)
+        && game.native_playing()
+        && game.player.is_some()
+        && game.focused
+    {
         game.capture(true);
     }
 }
